@@ -184,6 +184,108 @@ Requirements:
   }
 });
 
+app.post('/api/react-feature', async (req, res) => {
+  try {
+    const { code, prompt } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        ok: false,
+        error: "React code is required."
+      });
+    }
+
+    if (!prompt) {
+      return res.status(400).json({
+        ok: false,
+        error: "Please provide a prompt."
+      });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: `
+You are an expert React developer.
+
+The user has provided an existing React component and wants to modify it.
+
+EXISTING REACT CODE:
+
+${code}
+
+USER REQUEST:
+
+${prompt}
+
+Modify the React code according to the user's request.
+
+Rules:
+- Preserve the existing functionality unless the user specifically asks to change it.
+- Preserve existing functionality unless the user specifically asks to change it.
+- Preserve existing structure when it is not affected by the user's request.
+- If the user's request requires structural changes, freely modify the component structure to satisfy the request.
+- Return the COMPLETE updated React component.
+- Return valid React JSX.
+- Keep the component name unchanged.
+- Do not include import statements unless they are necessary.
+- Do not include export statements.
+- Do not use markdown.
+- Do not include explanations.
+
+Return ONLY valid JSON:
+
+{
+  "jsx": "complete updated React component code",
+  "css": "updated CSS if required"
+}
+`
+              }
+            ]
+          }
+        ]
+      }
+    );
+
+    const text =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      throw new Error("Gemini returned no result.");
+    }
+
+    const result = JSON.parse(
+      text
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim()
+    );
+
+    res.json({
+      ok: true,
+      jsx: result.jsx,
+      css: result.css || ""
+    });
+
+  } catch (err) {
+    console.error(
+      "React Feature Error:",
+      err.response?.data || err.message
+    );
+
+    res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
