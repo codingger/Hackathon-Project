@@ -8,48 +8,160 @@ function ReactFeature() {
     const [loading, setLoading] = useState(false);
 
     const createPreview = (jsx) => {
-        const safeJSX = jsx.replace(/<\/script>/gi, "<\\/script>");
+        let cleanCode = jsx;
 
-        return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-          }
-        </style>
-      </head>
+        // Remove import statements
+        cleanCode = cleanCode.replace(/^\s*import\b.*$/gm, "");
 
-      <body>
-        <div id="root"></div>
+        // Find component name
+        let componentName = "GeneratedPage";
 
-        <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        const defaultFunctionMatch = jsx.match(
+            /export\s+default\s+function\s+([A-Za-z_$][\w$]*)/
+        );
 
-        <script type="text/babel">
-          try {
-
-            ${safeJSX}
-
-            const root = ReactDOM.createRoot(
-              document.getElementById("root")
+        if (defaultFunctionMatch) {
+            componentName = defaultFunctionMatch[1];
+        } else {
+            const defaultVariableMatch = jsx.match(
+                /export\s+default\s+([A-Za-z_$][\w$]*)/
             );
 
-            root.render(<GeneratedPage />);
+            if (defaultVariableMatch) {
+                componentName = defaultVariableMatch[1];
+            } else {
+                const functionMatch = cleanCode.match(
+                    /function\s+([A-Za-z_$][\w$]*)\s*\(/
+                );
 
-          } catch (error) {
-            document.getElementById("root").innerHTML =
-              "<h3>Preview Error</h3><pre>" +
-              error.message +
-              "</pre>";
-          }
-        </script>
-      </body>
-      </html>
-    `;
+                if (functionMatch) {
+                    componentName = functionMatch[1];
+                }
+            }
+        }
+
+        // Remove export statements
+        cleanCode = cleanCode.replace(
+            /export\s+default\s+/g,
+            ""
+        );
+
+        cleanCode = cleanCode.replace(
+            /export\s+(?=(function|const|let|var|class))/g,
+            ""
+        );
+
+        // Prevent </script> from breaking iframe
+        cleanCode = cleanCode.replace(
+            /<\/script>/gi,
+            "<\\/script>"
+        );
+
+        return `
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script>
+
+window.onload = function() {
+
+    try {
+
+        const code = ${JSON.stringify(cleanCode)};
+
+        console.log("CODE SENT TO BABEL:", code);
+
+        const transformed = Babel.transform(code, {
+            presets: [
+                ["react", {
+                    runtime: "classic"
+                }]
+            ]
+        }).code;
+
+        const executeCode = new Function(
+            "React",
+            "ReactDOM",
+            "useState",
+            "useEffect",
+            "useContext",
+            "useReducer",
+            "useRef",
+            "useMemo",
+            "useCallback",
+            "useLayoutEffect",
+
+            transformed + "\\nreturn ${componentName};"
+        );
+
+        const Component = executeCode(
+            React,
+            ReactDOM,
+            React.useState,
+            React.useEffect,
+            React.useContext,
+            React.useReducer,
+            React.useRef,
+            React.useMemo,
+            React.useCallback,
+            React.useLayoutEffect
+        );
+
+        const root = ReactDOM.createRoot(
+            document.getElementById("root")
+        );
+
+        root.render(
+            React.createElement(Component)
+        );
+
+    } catch (error) {
+
+        document.getElementById("root").innerHTML = \`
+            <div style="padding:20px;font-family:Arial;color:#b00020;">
+                <h3>Preview Error</h3>
+                <pre style="white-space:pre-wrap;">
+\${error.stack || error.message}
+                </pre>
+            </div>
+        \`;
+
+        console.error(error);
+    }
+
+};
+
+</script>
+
+</body>
+</html>
+`;
     };
 
     const handleFileUpload = (e) => {
