@@ -6,10 +6,15 @@ import { Provider } from 'react-redux';
 import './index.css';
 import App from './App.jsx';
 import Reactfeature from "./reactfeature.jsx";
+import Home from "./home.jsx";
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path:"/",
+    element:<Home/>
+  },
+  {
+    path: "/wireframe",
     element: <App />
   },
    {
