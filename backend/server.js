@@ -116,14 +116,22 @@ Return ONLY valid JSON in this exact format:
 }
 
 Requirements:
-- Generate ONE React component.
-- Use React JSX syntax.
-- Recreate the wireframe layout and structure as accurately as possible.
-- Include all visible elements from the wireframe.
-- Use semantic HTML elements.
-- Use CSS classes for styling.
+
+- Generate ONE React component named GeneratedPage.
+- Use clean, reusable React JSX.
+- Treat the wireframe as a layout and design reference, NOT as the final content.
+- Recreate the structure and visual hierarchy of the wireframe.
+- Use semantic HTML elements such as:
+  h1, h2, h3, p, img, button, a, section, header, nav, footer.
+- Use realistic placeholder text that the developer can easily replace.
+- For images, use <img> elements with placeholder image URLs.
+- Do not draw images using CSS or SVG unless the wireframe specifically requires an icon.
+- Keep text directly inside the JSX so it can easily be edited.
+- Use meaningful class names.
+- Keep the JSX clean and readable.
+- The generated code should be suitable for copying into another React project.
 - Do not use Tailwind.
-- Do not use external libraries.
+- Do not use external UI libraries.
 - Do not create multiple pages.
 - Do not include import statements.
 - Do not include export statements.
