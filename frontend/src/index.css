@@ -5,5 +5,7 @@
 }
 body{
   min-height: 100vh;
-  font-family: system-ui,sans-serif;
+  font-family: Georgia, 'Times New Roman', serif;
+  background: #f4f1ea;
+  color: #161c1b;
 }
