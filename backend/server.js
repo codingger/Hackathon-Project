@@ -22,47 +22,47 @@ app.use('/storage', express.static('uploads'));
 const upload = multer({ dest: 'uploads/' });
 
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log("Connected to MongoDB successfully."))
-    .catch((err) => console.log("MongoDB connection error:", err));
+  .then(() => console.log("Connected to MongoDB successfully."))
+  .catch((err) => console.log("MongoDB connection error:", err));
 
 app.get('/api/elements', async (req, res) => {
-    try {
-        const { pageName, sectionId } = req.query;
-        let query = {};
-        if (pageName) query.pageName = pageName;
-        if (sectionId) query.sectionId = sectionId;
+  try {
+    const { pageName, sectionId } = req.query;
+    let query = {};
+    if (pageName) query.pageName = pageName;
+    if (sectionId) query.sectionId = sectionId;
 
-        const elements = await Elements.find(query);
-        res.json({ ok: true, data: elements });
-    } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
-    }
+    const elements = await Elements.find(query);
+    res.json({ ok: true, data: elements });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // PATCH route for live content edits
 app.patch('/api/elements/:fieldId', async (req, res) => {
-    try {
-        const { fieldId } = req.params;
-        const { content, css, pageName } = req.body;
-        
-        let updateData = {};
-        if (content !== undefined) updateData.content = content;
-        if (css !== undefined) updateData.css = css;
+  try {
+    const { fieldId } = req.params;
+    const { content, css, pageName } = req.body;
 
-        const updatedElement = await Elements.findOneAndUpdate(
-            { fieldId, pageName: pageName || 'Home' },
-            { $set: updateData },
-            { new: true }
-        );
+    let updateData = {};
+    if (content !== undefined) updateData.content = content;
+    if (css !== undefined) updateData.css = css;
 
-        if (!updatedElement) {
-            return res.status(404).json({ ok: false, error: "Element not found" });
-        }
+    const updatedElement = await Elements.findOneAndUpdate(
+      { fieldId, pageName: pageName || 'Home' },
+      { $set: updateData },
+      { new: true }
+    );
 
-        res.json({ ok: true, data: updatedElement });
-    } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+    if (!updatedElement) {
+      return res.status(404).json({ ok: false, error: "Element not found" });
     }
+
+    res.json({ ok: true, data: updatedElement });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // --- GEMINI API INTEGRATED GENERATE ROUTE ---
@@ -92,7 +92,7 @@ app.post('/api/generate', upload.single('wireframe'), async (req, res) => {
           {
             parts: [
               {
-                text:`
+                text: `
 You are an expert React frontend developer.
 
 Analyze the uploaded wireframe image and recreate the SINGLE PAGE shown in the wireframe.
@@ -286,6 +286,251 @@ Return ONLY valid JSON:
   }
 });
 
+app.post("/api/prompt-ui", async (req, res) => {
+    try {
+
+        const { prompt } = req.body;
+
+        if (!prompt) {
+            return res.status(400).json({
+                ok: false,
+                error: "Prompt required"
+            });
+        }
+
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                contents: [
+                    {
+                        parts: [
+                            {
+                                text: `
+You are an expert React frontend developer.
+
+Generate a complete React UI based on this user prompt:
+
+${prompt}
+
+IMPORTANT RULES:
+
+- Generate ONE complete React component.
+- The component MUST be named GeneratedPage.
+- Start with:
+function GeneratedPage() {
+
+- Do NOT use import statements.
+- Do NOT use export statements.
+- Do NOT use lucide-react.
+- Do NOT use external libraries.
+- Do NOT use external React components.
+- Use only React, standard HTML and CSS.
+- The component must work with React 18 loaded from a CDN.
+- Use React hooks such as useState only when necessary.
+- Keep the JSX completely self-contained.
+
+Return your response EXACTLY in this format:
+
+===JSX===
+[complete React component here]
+
+===CSS===
+[complete CSS here]
+
+Do not use markdown.
+Do not use code fences.
+Do not add explanations.
+`
+                            }
+                        ]
+                    }
+                ]
+            }
+        );
+
+        const text =
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            throw new Error("Gemini returned no result.");
+        }
+
+        const jsxMarker = "===JSX===";
+        const cssMarker = "===CSS===";
+
+        const jsxStart = text.indexOf(jsxMarker);
+        const cssStart = text.indexOf(cssMarker);
+
+        if (jsxStart === -1 || cssStart === -1) {
+            throw new Error("Gemini returned an invalid format.");
+        }
+
+        const jsx = text
+            .substring(
+                jsxStart + jsxMarker.length,
+                cssStart
+            )
+            .trim();
+
+        const css = text
+            .substring(
+                cssStart + cssMarker.length
+            )
+            .trim();
+
+        res.json({
+            ok: true,
+            jsx: jsx,
+            css: css
+        });
+
+    } catch (err) {
+
+        console.error(
+            "Prompt UI Error:",
+            err.response?.data || err.message
+        );
+
+        res.status(500).json({
+            ok: false,
+            error: err.response?.data || err.message
+        });
+
+    }
+});
+
+app.post("/api/prompt-ui-update", async (req, res) => {
+    try {
+
+        const { code, css, prompt } = req.body;
+
+        if (!code) {
+            return res.status(400).json({
+                ok: false,
+                error: "React code is required."
+            });
+        }
+
+        if (!prompt) {
+            return res.status(400).json({
+                ok: false,
+                error: "Update prompt required."
+            });
+        }
+
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                contents: [
+                    {
+                        parts: [
+                            {
+                                text: `
+You are an expert React frontend developer.
+
+You are modifying an existing React UI.
+
+EXISTING REACT CODE:
+
+${code}
+
+EXISTING CSS:
+
+${css || ""}
+
+USER REQUEST:
+
+${prompt}
+
+Modify the existing UI according to the user's request.
+
+IMPORTANT RULES:
+
+- Return the COMPLETE updated React component.
+- Keep the component name as GeneratedPage.
+- Preserve existing functionality unless the user asks to change it.
+- Preserve the existing design unless the user asks to change it.
+- Use only React and standard HTML.
+- Do NOT use import statements.
+- Do NOT use export statements.
+- Do NOT use lucide-react.
+- Do NOT use external libraries.
+- Keep the component completely self-contained.
+- Return the COMPLETE updated CSS as well.
+- Do not remove existing CSS unless it is no longer needed.
+
+Return the response EXACTLY in this format:
+
+===JSX===
+[complete updated React component here]
+
+===CSS===
+[complete updated CSS here]
+
+Do not use markdown.
+Do not use code fences.
+Do not add explanations.
+Do not add anything before ===JSX===.
+Do not add anything after the CSS.
+`
+                            }
+                        ]
+                    }
+                ]
+            }
+        );
+
+        const text =
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            throw new Error("Gemini returned no result.");
+        }
+
+        const jsxMarker = "===JSX===";
+        const cssMarker = "===CSS===";
+
+        const jsxStart = text.indexOf(jsxMarker);
+        const cssStart = text.indexOf(cssMarker);
+
+        if (jsxStart === -1 || cssStart === -1) {
+            throw new Error("Gemini returned an invalid format.");
+        }
+
+        const jsx = text
+            .substring(
+                jsxStart + jsxMarker.length,
+                cssStart
+            )
+            .trim();
+
+        const updatedCss = text
+            .substring(
+                cssStart + cssMarker.length
+            )
+            .trim();
+
+        res.json({
+            ok: true,
+            jsx: jsx,
+            css: updatedCss
+        });
+
+    } catch (err) {
+
+        console.error(
+            "Prompt UI Update Error:",
+            err.response?.data || err.message
+        );
+
+        res.status(500).json({
+            ok: false,
+            error: err.response?.data || err.message
+        });
+
+    }
+});
+
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });

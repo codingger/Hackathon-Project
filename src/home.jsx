@@ -7,6 +7,9 @@ function Home(){
             <Link to="/wireframe">Wireframe to React</Link>
             <br/>
             <Link to="/react-feature">React Feature</Link>
+            <br/>
+            <Link to="/prompt-ui">Promt Feature</Link>
+            
         </div>
     );
 }

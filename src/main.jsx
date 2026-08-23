@@ -7,6 +7,7 @@ import './index.css';
 import App from './App.jsx';
 import Reactfeature from "./reactfeature.jsx";
 import Home from "./home.jsx";
+import PromptUI from "./promptUI.jsx";
 
 const router = createBrowserRouter([
   {
@@ -20,6 +21,10 @@ const router = createBrowserRouter([
    {
     path: "/react-feature",
     element: <Reactfeature />
+  },
+  {
+    path: "/prompt-ui",
+    element: <PromptUI />
   }
 ]);
 
