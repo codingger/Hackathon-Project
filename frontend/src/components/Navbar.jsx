@@ -6,7 +6,7 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <div className="navbar-brand">
-        <span>Studio</span>
+        <span>ForgeKit</span>
         <span className="navbar-brand-badge">AI</span>
       </div>
       <nav className="navbar-tabs">
