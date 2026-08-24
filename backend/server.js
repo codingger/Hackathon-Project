@@ -35,47 +35,49 @@ mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 })
     console.warn("MongoDB connection warning:", err.message);
   });
 
-// Helper function to call Gemini API with exponential retry, multi-model fallback & rate limit resilience
+// Helper function to call Gemini API using active Gemini 3.6/3.5 models
 async function callGeminiAPI(payload) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file.");
   }
 
+  // Active Google AI Studio models for new API accounts
   const models = [
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash-lite-preview-02-05',
-    'gemini-1.5-flash-8b'
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-2.5-pro'
   ];
 
   for (const model of models) {
-    // Retry up to 2 times per model with exponential delay
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const response = await axios.post(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
           payload,
-          { timeout: 20000 }
+          { timeout: 30000 }
         );
 
         const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) {
+          console.log(`[Gemini API] Successfully generated output using model: ${model}`);
+          return text;
+        }
       } catch (err) {
         if (err.response?.status === 429) {
           console.warn(`[Gemini API] Model ${model} rate limited (429, attempt ${attempt}). Waiting 2s...`);
           await new Promise((r) => setTimeout(r, 2000));
           continue;
         }
-        console.warn(`[Gemini API] Model ${model} error: ${err.message}`);
-        break; // Move to next model on non-429 error
+        console.warn(`[Gemini API] Model ${model} returned error status ${err.response?.status || 'network'}: ${err.message}. Trying next model...`);
+        break; // Move to next valid model
       }
     }
   }
 
-  return null; // Return null so callers can handle graceful smart fallback
+  return null;
 }
 
 // Helper to generate a contract-compliant fallback component if AI rate limit is exhausted
