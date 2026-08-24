@@ -8,7 +8,7 @@ A full-stack AI-driven web development studio and CMS platform that converts wir
 
 ### 1. Prerequisites
 - Node.js 18+ and npm
-- MongoDB running locally (`mongodb://localhost:27017`) or a MongoDB Atlas connection string
+- MongoDB running locally (`mongodb://127.0.0.1:27017/forgekit`) or a MongoDB Atlas connection string
 - A Google Gemini API Key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ### 2. Backend Setup
@@ -19,6 +19,7 @@ cp .env.example .env
 # Open .env and add your GEMINI_API_KEY and MONGODB_URI
 npm start
 ```
+*Note for MongoDB Atlas Users: Ensure your Atlas Security -> Network Access settings allow connections from `0.0.0.0/0` (Allow Access from Anywhere).*  
 *Backend runs at `http://localhost:3000` (API base: `http://localhost:3000/api`).*
 
 ### 3. Frontend Setup
@@ -72,7 +73,7 @@ npm run dev
 | `/api/sections` | `GET` | Lists all persisted sections |
 | `/api/sections/:sectionId` | `GET` | Fetches section metadata and all element documents for a section |
 | `/api/elements` | `GET` | Lists element documents by pageName/sectionId |
-| `/api/elements/:fieldId` | `PATCH` | Updates element content/css in MongoDB |
+| `/api/elements/:fieldId` | `PATCH` | Updates element content/css in MongoDB with upsert support |
 
 ---
 
