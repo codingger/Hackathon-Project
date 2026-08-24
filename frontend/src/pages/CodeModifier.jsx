@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { modifyReactCode } from '../services/api';
+import { modifyReactCode, updatePromptUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
 
@@ -24,15 +24,16 @@ export default function CodeModifier() {
   const [code, setCode] = useState(EXAMPLE_COMPONENT);
   const [fileName, setFileName] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [refinePrompt, setRefinePrompt] = useState('');
   const [resultJsx, setResultJsx] = useState('');
   const [resultCss, setResultCss] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
 
   const hasCode = code.trim().length > 0;
-  // Require at least 8 characters and at least 2 words
   const isMeaningfulPrompt = prompt.trim().length >= 8 && prompt.trim().split(/\s+/).filter(Boolean).length >= 2;
   const canApply = !loading && hasCode && isMeaningfulPrompt;
 
@@ -41,10 +42,15 @@ export default function CodeModifier() {
     if (!f) return;
     setFileName(f.name);
     const reader = new FileReader();
-    reader.onload = (ev) => setCode(ev.target.result || '');
+    reader.onload = (ev) => {
+      setCode(ev.target.result || '');
+      setResultJsx(''); // Reset previously evolved state on new file upload
+      setResultCss('');
+    };
     reader.readAsText(f);
   };
 
+  // Initial code evolution
   const apply = async (e) => {
     e.preventDefault();
     if (!hasCode) { setError('Please paste or upload React code first.'); return; }
@@ -64,6 +70,26 @@ export default function CodeModifier() {
       setError(err.response?.data?.error || err.message);
     }
     setLoading(false);
+  };
+
+  // Iterative prompt tweak on the CURRENT evolved component
+  const refine = async (e) => {
+    e.preventDefault();
+    if (!refinePrompt.trim()) return;
+    setRefining(true);
+    setError('');
+    try {
+      const currentJsx = resultJsx || code;
+      const { data } = await updatePromptUI(currentJsx, resultCss, refinePrompt);
+      if (!data.ok) throw new Error(data.error);
+      setResultJsx(data.jsx);
+      setResultCss(data.css || '');
+      setRefinePrompt('');
+      setTab('preview');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
+    setRefining(false);
   };
 
   const displayCode = resultJsx || code;
@@ -111,7 +137,9 @@ export default function CodeModifier() {
                     <textarea 
                       className="code-textarea"
                       value={code} 
-                      onChange={(e) => setCode(e.target.value)} 
+                      onChange={(e) => {
+                        setCode(e.target.value);
+                      }} 
                       rows="7" 
                       placeholder="Paste your React component JSX here..." 
                       spellCheck="false"
@@ -175,6 +203,30 @@ export default function CodeModifier() {
               {error && <div className="error-msg">{error}</div>}
             </form>
           </div>
+
+          {/* Prompt Tweaking Card on Current UI */}
+          {resultJsx && (
+            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
+              <div className="blueprint-header">
+                <span className="eyebrow">TWEAK CURRENT UI</span>
+                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Write message to AI</h3>
+              </div>
+              <form onSubmit={refine} className="blueprint-form">
+                <div className="field-group">
+                  <textarea 
+                    className="field-textarea"
+                    value={refinePrompt} 
+                    onChange={(e) => setRefinePrompt(e.target.value)} 
+                    rows="3" 
+                    placeholder="Tell the AI what to add or tweak on the current UI (e.g. Add a contact form below, make buttons dark green...)" 
+                  />
+                </div>
+                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
+                  {refining ? 'Updating Current UI...' : 'Update Current UI'}
+                </button>
+              </form>
+            </div>
+          )}
         </section>
 
         {/* Right Panel: Live Evolved Preview */}
@@ -227,6 +279,20 @@ export default function CodeModifier() {
             {tab === 'jsx' && <CodeViewer code={displayCode} label={displayLabel} />}
             {tab === 'css' && <CodeViewer code={resultCss} label="Styles (CSS)" />}
           </div>
+
+          {resultJsx && (
+            <form className="refine-bar" onSubmit={refine}>
+              <input 
+                className="refine-input"
+                value={refinePrompt} 
+                onChange={(e) => setRefinePrompt(e.target.value)} 
+                placeholder="Message AI to tweak current UI: e.g. Add a navbar logo, change font to sans-serif..." 
+              />
+              <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
+                {refining ? 'Updating...' : 'Tweak Current UI'}
+              </button>
+            </form>
+          )}
         </section>
 
       </div>

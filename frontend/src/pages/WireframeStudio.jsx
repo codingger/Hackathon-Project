@@ -50,6 +50,7 @@ export default function WireframeStudio() {
     setRefining(true);
     setError('');
     try {
+      // Passes current JSX & CSS to modify the existing UI directly in place
       const { data } = await updatePromptUI(jsx, css, refinePrompt);
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
@@ -166,12 +167,12 @@ export default function WireframeStudio() {
             </form>
           </div>
 
-          {/* Tweak / Refine Section once generated */}
+          {/* Tweak / Refine Section on Current UI */}
           {jsx && (
             <div className="blueprint-card" style={{ marginTop: '1rem' }}>
               <div className="blueprint-header">
-                <span className="eyebrow">TWEAK GENERATED UI BY PROMPT</span>
-                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Refine Layout with Prompts</h3>
+                <span className="eyebrow">TWEAK CURRENT UI</span>
+                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Message AI to Tweak Current UI</h3>
               </div>
               <form onSubmit={refine} className="blueprint-form">
                 <div className="field-group">
@@ -180,11 +181,11 @@ export default function WireframeStudio() {
                     value={refinePrompt} 
                     onChange={(e) => setRefinePrompt(e.target.value)} 
                     rows="3" 
-                    placeholder="e.g. Add a pricing section below the features, change button to teal..." 
+                    placeholder="Tell the AI what to add or tweak on the current UI (e.g. Add a pricing section below the features, change button to teal...)" 
                   />
                 </div>
                 <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
-                  {refining ? 'Applying Changes...' : 'Apply Prompt Changes'}
+                  {refining ? 'Updating Current UI...' : 'Update Current UI'}
                 </button>
               </form>
             </div>
@@ -247,10 +248,10 @@ export default function WireframeStudio() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Refine prompt: e.g. Add pricing section, change background color..." 
+                placeholder="Message AI to tweak current UI: e.g. Add a pricing section below, change button to teal..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
-                {refining ? 'Updating...' : 'Refine UI'}
+                {refining ? 'Updating...' : 'Tweak Current UI'}
               </button>
             </form>
           )}
