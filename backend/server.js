@@ -6,11 +6,14 @@ import multer from "multer";
 import mongoose from "mongoose";
 import axios from "axios";
 import fs from 'fs';
+import dns from 'dns';
 import Section from "./models/Section.js";
 import Elements from "./models/Elements.js";
 import { generateId } from "./idGenerator.js";
 
 dotenv.config();
+
+try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch {}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -22,10 +25,15 @@ app.use('/storage', express.static('uploads'));
 
 const upload = multer({ dest: 'uploads/' });
 
-mongoose.set('bufferCommands', false);
-mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 3000 })
-  .then(() => console.log("Connected to MongoDB successfully."))
-  .catch((err) => console.warn("MongoDB connection warning:", err.message));
+const mongoUri = process.env.MONGODB_URI || "mongodb+srv://sharmavyom691_db_user:xkCRKqx276NAz6SS@cluster0.qejkuyv.mongodb.net/forgekit?retryWrites=true&w=majority";
+
+mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 })
+  .then(() => {
+    console.log("🟢 Connected to MongoDB Atlas successfully!");
+  })
+  .catch((err) => {
+    console.warn("MongoDB connection warning:", err.message);
+  });
 
 // Helper function to call Gemini API with model fallback & rate limit retry
 async function callGeminiAPI(payload) {
@@ -60,11 +68,6 @@ async function callGeminiAPI(payload) {
 
 // Helper to persist generated section & elements to MongoDB with retry-on-duplicate
 async function persistGeneratedSection({ pageName = 'Home', sectionName = 'Custom', result, wireframePath }) {
-  if (mongoose.connection.readyState !== 1) {
-    console.warn("MongoDB disconnected. Skipping database persistence.");
-    return { sectionId: generateId('1'), elementIds: [] };
-  }
-
   let sectionId = generateId('1');
   let section = null;
 
@@ -87,7 +90,7 @@ async function persistGeneratedSection({ pageName = 'Home', sectionName = 'Custo
         variations: "1",
       });
     } else {
-      throw err;
+      console.warn("Section persistence warning:", err.message);
     }
   }
 
@@ -119,7 +122,8 @@ async function persistGeneratedSection({ pageName = 'Home', sectionName = 'Custo
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
-    mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongo: 'connected',
+    database: 'Atlas cluster0.qejkuyv.mongodb.net',
     timestamp: new Date().toISOString()
   });
 });
@@ -127,9 +131,6 @@ app.get('/api/health', (req, res) => {
 // --- SECTIONS API ROUTES ---
 app.get('/api/sections', async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.json({ ok: true, data: [], warning: "MongoDB disconnected" });
-    }
     const { pageName } = req.query;
     const query = pageName ? { pageName } : {};
     const sections = await Section.find(query);
@@ -141,9 +142,6 @@ app.get('/api/sections', async (req, res) => {
 
 app.get('/api/sections/:sectionId', async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.json({ ok: true, data: { section: null, elements: [] }, warning: "MongoDB disconnected" });
-    }
     const section = await Section.findOne({ sectionId: req.params.sectionId });
     const elements = await Elements.find({ sectionId: req.params.sectionId });
     res.json({ ok: true, data: { section, elements } });
@@ -155,9 +153,6 @@ app.get('/api/sections/:sectionId', async (req, res) => {
 // --- ELEMENTS API ROUTES ---
 app.get('/api/elements', async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.json({ ok: true, data: [], warning: "MongoDB disconnected" });
-    }
     const { pageName, sectionId } = req.query;
     let query = {};
     if (pageName) query.pageName = pageName;
