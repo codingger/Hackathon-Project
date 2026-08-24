@@ -35,44 +35,34 @@ mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 })
     console.warn("MongoDB connection warning:", err.message);
   });
 
-// Helper function to call Gemini API using active Gemini 3.6/3.5 models
+// Ultra-fast Gemini API helper streamlined to 2 top models with zero delay
 async function callGeminiAPI(payload) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file.");
   }
 
+  // 2 fastest, top-performing models
   const models = [
     'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-2.5-pro'
+    'gemini-3.5-flash'
   ];
 
   for (const model of models) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-          payload,
-          { timeout: 30000 }
-        );
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+        payload,
+        { timeout: 12000 }
+      );
 
-        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          console.log(`[Gemini API] Successfully generated output using model: ${model}`);
-          return text;
-        }
-      } catch (err) {
-        if (err.response?.status === 429) {
-          console.warn(`[Gemini API] Model ${model} rate limited (429, attempt ${attempt}). Waiting 2s...`);
-          await new Promise((r) => setTimeout(r, 2000));
-          continue;
-        }
-        console.warn(`[Gemini API] Model ${model} returned error status ${err.response?.status || 'network'}: ${err.message}. Trying next model...`);
-        break;
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        console.log(`[Gemini API] Successfully generated output using model: ${model}`);
+        return text;
       }
+    } catch (err) {
+      console.warn(`[Gemini API] Model ${model} failed (${err.response?.status || 'timeout'}). Trying next model...`);
     }
   }
 
