@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generateFromWireframe } from '../services/api';
+import { generateFromWireframe, updatePromptUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
 
@@ -13,9 +13,11 @@ const PRESETS = [
 export default function WireframeStudio() {
   const [file, setFile] = useState(null);
   const [prompt, setPrompt] = useState('');
+  const [refinePrompt, setRefinePrompt] = useState('');
   const [jsx, setJsx] = useState('');
   const [css, setCss] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
@@ -40,6 +42,24 @@ export default function WireframeStudio() {
       setError(err.response?.data?.error || err.message);
     }
     setLoading(false);
+  };
+
+  const refine = async (e) => {
+    e.preventDefault();
+    if (!refinePrompt.trim()) return;
+    setRefining(true);
+    setError('');
+    try {
+      const { data } = await updatePromptUI(jsx, css, refinePrompt);
+      if (!data.ok) throw new Error(data.error);
+      setJsx(data.jsx);
+      setCss(data.css || '');
+      setRefinePrompt('');
+      setTab('preview');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
+    setRefining(false);
   };
 
   const handleDrop = (e) => {
@@ -145,6 +165,30 @@ export default function WireframeStudio() {
               {error && <div className="error-msg">{error}</div>}
             </form>
           </div>
+
+          {/* Tweak / Refine Section once generated */}
+          {jsx && (
+            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
+              <div className="blueprint-header">
+                <span className="eyebrow">TWEAK GENERATED UI BY PROMPT</span>
+                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Refine Layout with Prompts</h3>
+              </div>
+              <form onSubmit={refine} className="blueprint-form">
+                <div className="field-group">
+                  <textarea 
+                    className="field-textarea"
+                    value={refinePrompt} 
+                    onChange={(e) => setRefinePrompt(e.target.value)} 
+                    rows="3" 
+                    placeholder="e.g. Add a pricing section below the features, change button to teal..." 
+                  />
+                </div>
+                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
+                  {refining ? 'Applying Changes...' : 'Apply Prompt Changes'}
+                </button>
+              </form>
+            </div>
+          )}
         </section>
 
         {/* Right Panel: Live Stage */}
@@ -196,6 +240,20 @@ export default function WireframeStudio() {
             {tab === 'jsx' && <CodeViewer code={jsx} label="React JSX Component" />}
             {tab === 'css' && <CodeViewer code={css} label="Styles (CSS)" />}
           </div>
+
+          {jsx && (
+            <form className="refine-bar" onSubmit={refine}>
+              <input 
+                className="refine-input"
+                value={refinePrompt} 
+                onChange={(e) => setRefinePrompt(e.target.value)} 
+                placeholder="Refine prompt: e.g. Add pricing section, change background color..." 
+              />
+              <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
+                {refining ? 'Updating...' : 'Refine UI'}
+              </button>
+            </form>
+          )}
         </section>
 
       </div>

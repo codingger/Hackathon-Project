@@ -120,6 +120,30 @@ export default function PromptStudio() {
               {error && <div className="error-msg">{error}</div>}
             </form>
           </div>
+
+          {/* Tweak / Update UI Section (Nikunj's Prompt Update feature) */}
+          {jsx && (
+            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
+              <div className="blueprint-header">
+                <span className="eyebrow">UPDATE GENERATED UI</span>
+                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Tweak UI with Prompts</h3>
+              </div>
+              <form onSubmit={refine} className="blueprint-form">
+                <div className="field-group">
+                  <textarea 
+                    className="field-textarea"
+                    value={refinePrompt} 
+                    onChange={(e) => setRefinePrompt(e.target.value)} 
+                    rows="3" 
+                    placeholder="e.g. Add a pricing section below the features, make buttons dark green..." 
+                  />
+                </div>
+                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
+                  {refining ? 'Applying Changes...' : 'Apply Prompt Changes'}
+                </button>
+              </form>
+            </div>
+          )}
         </section>
 
         {/* Right Panel: Live Stage */}
