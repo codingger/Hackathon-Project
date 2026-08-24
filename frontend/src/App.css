@@ -914,6 +914,42 @@ body {
   color: var(--accent-color);
 }
 
+.visual-add-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.visual-add-label {
+  font: 700 0.65rem system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.visual-delete-btn {
+  background: transparent;
+  border: none;
+  color: #991b1b;
+  opacity: 0.65;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.visual-delete-btn:hover {
+  opacity: 1;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .visual-editor-list {
   display: flex;
   flex-direction: column;

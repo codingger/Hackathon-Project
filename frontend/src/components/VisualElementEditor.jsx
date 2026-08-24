@@ -4,18 +4,18 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
 
-  // Extract all editable text elements from JSX
+  // Extract all editable text elements from JSX (including empty tags so boxes don't vanish)
   const elements = useMemo(() => {
     if (!jsx) return [];
     const items = [];
-    // Regex matching text inside HTML elements like <h1>text</h1>, <button>text</button>, etc.
-    const regex = /<(h[1-6]|p|button|a|span|li|strong|em|td|th)[^>]*>([^<>{}+]+)<\/\1>/gi;
+    // Match HTML tags like <h1>...</h1>, <button>...</button>, etc. (allowing empty text)
+    const regex = /<(h[1-6]|p|button|a|span|li|strong|em|td|th)[^>]*>([^<>{}+]*)<\/\1>/gi;
     let match;
     let index = 0;
     while ((match = regex.exec(jsx)) !== null) {
       const tag = match[1].toLowerCase();
-      const text = match[2].trim();
-      if (text.length > 0 && !text.includes('React.') && !text.includes('function')) {
+      const text = match[2];
+      if (!text.includes('React.') && !text.includes('function')) {
         items.push({
           id: `el_${index++}`,
           tag: tag,
@@ -35,21 +35,55 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
     );
   }, [elements, search]);
 
+  // Handle live text edits (keeps box even if text is empty)
   const handleTextChange = (item, newText) => {
     if (!jsx) return;
     const oldFullMatch = item.fullMatch;
     if (!oldFullMatch) return;
 
-    // Safely replace text ONLY within the matched HTML tag structure
-    const newFullMatch = oldFullMatch.replace(item.text, newText);
+    // Construct new tag match: <tag attr...>newText</tag>
+    const openingTagMatch = oldFullMatch.match(/^<[a-z0-9]+[^>]*>/i);
+    if (!openingTagMatch) return;
+
+    const openingTag = openingTagMatch[0];
+    const closingTag = `</${item.tag}>`;
+    const newFullMatch = `${openingTag}${newText}${closingTag}`;
+
     if (oldFullMatch === newFullMatch) return;
 
     const updatedJsx = jsx.replace(oldFullMatch, newFullMatch);
-    
-    // Update local item references for uninterrupted live typing
+
+    // Update item reference for live typing continuity
     item.fullMatch = newFullMatch;
     item.text = newText;
 
+    onJsxChange(updatedJsx);
+  };
+
+  // Explicitly delete element from React JSX when Trash Icon is clicked
+  const handleDeleteElement = (item, e) => {
+    e.stopPropagation();
+    if (!jsx || !item.fullMatch) return;
+    const updatedJsx = jsx.replace(item.fullMatch, '');
+    onJsxChange(updatedJsx);
+  };
+
+  // Add new element to React JSX
+  const handleAddElement = (tagType) => {
+    if (!jsx) return;
+    let newElementTag = '';
+    if (tagType === 'heading') newElementTag = '<h2>New Custom Heading</h2>';
+    else if (tagType === 'button') newElementTag = '<button style={{ padding: "10px 20px", background: "#2a6f6f", color: "#fff", border: "none", borderRadius: "6px" }}>New Button Action</button>';
+    else if (tagType === 'paragraph') newElementTag = '<p>New paragraph description text...</p>';
+
+    // Insert before the last closing </div> or at the end of return statement
+    let updatedJsx = jsx;
+    const lastDivIndex = jsx.lastIndexOf('</div>');
+    if (lastDivIndex !== -1) {
+      updatedJsx = jsx.slice(0, lastDivIndex) + `\n      ${newElementTag}\n` + jsx.slice(lastDivIndex);
+    } else {
+      updatedJsx += `\n${newElementTag}`;
+    }
     onJsxChange(updatedJsx);
   };
 
@@ -70,25 +104,43 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
   return (
     <div className="visual-editor-container">
       <div className="visual-editor-sidebar">
+        
+        {/* Header & Add Actions */}
         <div className="visual-editor-header">
           <span className="eyebrow">DIRECT HAND EDITOR</span>
-          <h3>Select Box & Edit Content</h3>
-          <span className="visual-editor-count">{elements.length} editable elements found</span>
+          <h3>Edit Text, Add & Delete</h3>
+          <span className="visual-editor-count">{elements.length} editable boxes</span>
         </div>
 
+        {/* Quick Add Element Buttons */}
+        <div className="visual-add-bar">
+          <span className="visual-add-label">+ Add New:</span>
+          <button type="button" className="preset-chip" onClick={() => handleAddElement('heading')}>
+            + Heading
+          </button>
+          <button type="button" className="preset-chip" onClick={() => handleAddElement('button')}>
+            + Button
+          </button>
+          <button type="button" className="preset-chip" onClick={() => handleAddElement('paragraph')}>
+            + Text
+          </button>
+        </div>
+
+        {/* Search */}
         <div className="visual-editor-search">
           <input 
             type="text" 
             className="field-input" 
-            placeholder="Search headline, button, or text..." 
+            placeholder="Search boxes..." 
             value={search} 
             onChange={(e) => setSearch(e.target.value)} 
           />
         </div>
 
+        {/* Element Boxes List */}
         <div className="visual-editor-list">
           {filteredElements.length === 0 ? (
-            <div className="cms-empty-state">No matching text elements found.</div>
+            <div className="cms-empty-state">No matching element boxes found.</div>
           ) : (
             filteredElements.map((item) => (
               <div 
@@ -97,17 +149,35 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
                 onClick={() => setSelectedId(item.id)}
               >
                 <div className="visual-box-header">
-                  <span className={`tag-badge ${getTagBadgeClass(item.tag)}`}>
-                    {item.tag.toUpperCase()}
-                  </span>
-                  <span className="visual-box-id">Box #{item.id.replace('el_', '')}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className={`tag-badge ${getTagBadgeClass(item.tag)}`}>
+                      {item.tag.toUpperCase()}
+                    </span>
+                    <span className="visual-box-id">Box #{item.id.replace('el_', '')}</span>
+                  </div>
+
+                  {/* Explicit Trash Delete Icon */}
+                  <button 
+                    type="button" 
+                    className="visual-delete-btn"
+                    onClick={(e) => handleDeleteElement(item, e)}
+                    title="Delete box from UI"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
                 </div>
 
                 <div className="visual-box-body">
-                  {item.text.length > 50 || item.tag === 'p' ? (
+                  {item.tag === 'p' || item.text.length > 50 ? (
                     <textarea 
                       className="field-textarea"
                       rows="2"
+                      placeholder="(Empty content - type text here...)"
                       value={item.text}
                       onChange={(e) => handleTextChange(item, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -116,6 +186,7 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
                     <input 
                       type="text" 
                       className="field-input"
+                      placeholder="(Empty content - type text here...)"
                       value={item.text}
                       onChange={(e) => handleTextChange(item, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -126,6 +197,7 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
             ))
           )}
         </div>
+
       </div>
     </div>
   );
