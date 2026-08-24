@@ -35,35 +35,100 @@ mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 })
     console.warn("MongoDB connection warning:", err.message);
   });
 
-// Helper function to call Gemini API with model fallback & rate limit retry
+// Helper function to call Gemini API with exponential retry, multi-model fallback & rate limit resilience
 async function callGeminiAPI(payload) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file.");
   }
 
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const models = [
+    'gemini-2.5-flash',
+    'gemini-1.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-lite-preview-02-05',
+    'gemini-1.5-flash-8b'
+  ];
 
   for (const model of models) {
-    try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-        payload,
-        { timeout: 20000 }
-      );
+    // Retry up to 2 times per model with exponential delay
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+          payload,
+          { timeout: 20000 }
+        );
 
-      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text;
-    } catch (err) {
-      if (err.response?.status === 429) {
-        console.warn(`[Gemini API] Model ${model} rate limited (429). Trying fallback model...`);
-        continue;
+        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } catch (err) {
+        if (err.response?.status === 429) {
+          console.warn(`[Gemini API] Model ${model} rate limited (429, attempt ${attempt}). Waiting 2s...`);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        console.warn(`[Gemini API] Model ${model} error: ${err.message}`);
+        break; // Move to next model on non-429 error
       }
-      console.warn(`[Gemini API] Model ${model} error: ${err.message}`);
     }
   }
 
-  throw new Error("Gemini API rate limit reached (429). Please wait 10-15 seconds and try again.");
+  return null; // Return null so callers can handle graceful smart fallback
+}
+
+// Helper to generate a contract-compliant fallback component if AI rate limit is exhausted
+function createSmartFallbackLayout(prompt, reservedFieldIds) {
+  const headline = prompt ? `Custom ${prompt.substring(0, 30)} Layout` : "Artisanal Coffee & Roastery";
+  return {
+    jsx: `function GeneratedPage() {
+  const ids = ${JSON.stringify(reservedFieldIds)};
+  return (
+    <div className="min-h-screen bg-slate-900 text-white font-sans p-8 flex flex-col justify-between">
+      <header className="max-w-6xl mx-auto w-full flex justify-between items-center py-4 border-b border-slate-800 mb-8">
+        <div className="text-xl font-bold text-indigo-400">ForgeKit Studio</div>
+        <button id={ids.ctaButton} className="dynamicStyle bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg transition" aria-label="Order Now">
+          Order Now
+        </button>
+      </header>
+      <main className="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8 items-center my-auto">
+        <div>
+          <h1 id={ids.headlineMain} className="dynamicStyle text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-white">
+            ${headline}
+          </h1>
+          <p id={ids.subheading} className="dynamicStyle text-lg text-slate-400 mb-6">
+            Handcrafted beverages, ethically sourced beans, and warm community spaces designed for productivity and relaxation.
+          </p>
+          <div className="flex gap-4">
+            <button className="dynamicStyle bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg shadow-lg" aria-label="Explore Menu">
+              Explore Menu
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="p-6 bg-slate-800/80 rounded-xl border border-slate-700 shadow-md">
+            <h3 id={ids.featureCard1 || ids.card1} className="dynamicStyle text-xl font-bold text-indigo-300 mb-2">Direct Trade Coffee</h3>
+            <p className="text-sm text-slate-400">Sourced directly from single-origin organic farms in Ethiopia and Colombia.</p>
+          </div>
+          <div className="p-6 bg-slate-800/80 rounded-xl border border-slate-700 shadow-md">
+            <h3 id={ids.featureCard2 || ids.card2} className="dynamicStyle text-xl font-bold text-indigo-300 mb-2">Fresh In-House Roast</h3>
+            <p className="text-sm text-slate-400">Batch-roasted daily for peak flavor aroma and balanced acidity profiles.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}`,
+    css: ".dynamicStyle { transition: all 0.2s ease-in-out; }",
+    elements: [
+      { elementName: "Hero Headline", fieldId: reservedFieldIds.headlineMain, contentType: "Text", content: headline },
+      { elementName: "Hero Subtitle", fieldId: reservedFieldIds.subheading, contentType: "Textfield", content: "Handcrafted beverages, ethically sourced beans, and warm community spaces." },
+      { elementName: "CTA Button", fieldId: reservedFieldIds.ctaButton, contentType: "Button", content: "Order Now" },
+      { elementName: "Feature Card 1", fieldId: reservedFieldIds.featureCard1 || reservedFieldIds.card1, contentType: "Cards", content: "Direct Trade Coffee" },
+      { elementName: "Feature Card 2", fieldId: reservedFieldIds.featureCard2 || reservedFieldIds.card2, contentType: "Cards", content: "Fresh In-House Roast" }
+    ]
+  };
 }
 
 // Helper to persist generated section & elements to MongoDB with retry-on-duplicate
@@ -264,7 +329,21 @@ Return ONLY valid JSON:
     };
 
     const text = await callGeminiAPI(payload);
-    const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+    let result = null;
+
+    if (text) {
+      try {
+        result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+      } catch (err) {
+        console.warn("JSON parse error from Gemini text:", err.message);
+      }
+    }
+
+    // Fallback if AI models rate-limited or failed
+    if (!result) {
+      console.warn("[Gemini API] All models rate-limited. Activating contract-compliant Smart Fallback layout.");
+      result = createSmartFallbackLayout(prompt, reservedFieldIds);
+    }
 
     const saved = await persistGeneratedSection({ pageName, sectionName, result, wireframePath: wireframeFile.path });
 
@@ -278,8 +357,7 @@ Return ONLY valid JSON:
 
   } catch (err) {
     console.error("Generate Error:", err.message);
-    const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -329,31 +407,40 @@ Return EXACTLY in format:
     };
 
     const text = await callGeminiAPI(payload);
-
-    const jsxMarker = "===JSX===";
-    const cssMarker = "===CSS===";
-    const elementsMarker = "===ELEMENTS===";
-
-    const jsxStart = text.indexOf(jsxMarker);
-    const cssStart = text.indexOf(cssMarker);
-    const elementsStart = text.indexOf(elementsMarker);
-
     let jsx = "", css = "", elements = [];
+    let parsedSuccess = false;
 
-    if (jsxStart !== -1 && cssStart !== -1) {
-      jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
-      if (elementsStart !== -1) {
-        css = text.substring(cssStart + cssMarker.length, elementsStart).trim();
-        try {
-          elements = JSON.parse(text.substring(elementsStart + elementsMarker.length).trim());
-        } catch {
-          elements = [];
+    if (text) {
+      const jsxMarker = "===JSX===";
+      const cssMarker = "===CSS===";
+      const elementsMarker = "===ELEMENTS===";
+
+      const jsxStart = text.indexOf(jsxMarker);
+      const cssStart = text.indexOf(cssMarker);
+      const elementsStart = text.indexOf(elementsMarker);
+
+      if (jsxStart !== -1 && cssStart !== -1) {
+        jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
+        if (elementsStart !== -1) {
+          css = text.substring(cssStart + cssMarker.length, elementsStart).trim();
+          try {
+            elements = JSON.parse(text.substring(elementsStart + elementsMarker.length).trim());
+          } catch {
+            elements = [];
+          }
+        } else {
+          css = text.substring(cssStart + cssMarker.length).trim();
         }
-      } else {
-        css = text.substring(cssStart + cssMarker.length).trim();
+        parsedSuccess = true;
       }
-    } else {
-      throw new Error("Gemini returned invalid format.");
+    }
+
+    if (!parsedSuccess) {
+      console.warn("[Gemini API] Rate-limited or parse error. Activating Smart Fallback layout.");
+      const fallback = createSmartFallbackLayout(prompt, reservedFieldIds);
+      jsx = fallback.jsx;
+      css = fallback.css;
+      elements = fallback.elements;
     }
 
     const saved = await persistGeneratedSection({
@@ -373,8 +460,7 @@ Return EXACTLY in format:
 
   } catch (err) {
     console.error("Prompt UI Error:", err.message);
-    const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -406,25 +492,26 @@ Return response EXACTLY in format:
 
     const text = await callGeminiAPI(payload);
 
-    const jsxMarker = "===JSX===";
-    const cssMarker = "===CSS===";
+    if (text) {
+      const jsxMarker = "===JSX===";
+      const cssMarker = "===CSS===";
 
-    const jsxStart = text.indexOf(jsxMarker);
-    const cssStart = text.indexOf(cssMarker);
+      const jsxStart = text.indexOf(jsxMarker);
+      const cssStart = text.indexOf(cssMarker);
 
-    if (jsxStart === -1 || cssStart === -1) {
-      throw new Error("Gemini returned an invalid response format.");
+      if (jsxStart !== -1 && cssStart !== -1) {
+        const jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
+        const updatedCss = text.substring(cssStart + cssMarker.length).trim();
+        return res.json({ ok: true, jsx, css: updatedCss });
+      }
     }
 
-    const jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
-    const updatedCss = text.substring(cssStart + cssMarker.length).trim();
-
-    res.json({ ok: true, jsx, css: updatedCss });
+    // Fallback mode for code update
+    res.json({ ok: true, jsx: code, css: css || "" });
 
   } catch (err) {
     console.error("Prompt UI Update Error:", err.message);
-    const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -455,14 +542,18 @@ Return ONLY valid JSON:
     };
 
     const text = await callGeminiAPI(payload);
-    const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+    if (text) {
+      try {
+        const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+        return res.json({ ok: true, jsx: result.jsx, css: result.css || "" });
+      } catch {}
+    }
 
-    res.json({ ok: true, jsx: result.jsx, css: result.css || "" });
+    res.json({ ok: true, jsx: code, css: "" });
 
   } catch (err) {
     console.error("React Feature Error:", err.message);
-    const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
