@@ -8,6 +8,7 @@ import axios from "axios";
 import fs from 'fs';
 import Section from "./models/Section.js";
 import Elements from "./models/Elements.js";
+import { generateId } from "./idGenerator.js";
 
 dotenv.config();
 
@@ -33,7 +34,6 @@ async function callGeminiAPI(payload) {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file.");
   }
 
-  // Model fallback order in case of rate limits or unavailable models
   const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
@@ -58,6 +58,105 @@ async function callGeminiAPI(payload) {
   throw new Error("Gemini API rate limit reached (429). Please wait 10-15 seconds and try again.");
 }
 
+// Helper to persist generated section & elements to MongoDB with retry-on-duplicate
+async function persistGeneratedSection({ pageName = 'Home', sectionName = 'Custom', result, wireframePath }) {
+  if (mongoose.connection.readyState !== 1) {
+    console.warn("MongoDB disconnected. Skipping database persistence.");
+    return { sectionId: generateId('1'), elementIds: [] };
+  }
+
+  let sectionId = generateId('1');
+  let section = null;
+
+  // Retry once if 10-digit ID collision occurs
+  try {
+    section = await Section.create({
+      sectionId,
+      sectionName,
+      pageName,
+      isGenerated: true,
+      variations: "1",
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      sectionId = generateId('1');
+      section = await Section.create({
+        sectionId,
+        sectionName,
+        pageName,
+        isGenerated: true,
+        variations: "1",
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  const elementIds = [];
+  const rawElements = Array.isArray(result?.elements) ? result.elements : [];
+
+  for (const el of rawElements) {
+    const fieldId = el.fieldId || generateId('2');
+    try {
+      await Elements.create({
+        sectionId,
+        elementName: el.elementName || 'CMS Field',
+        fieldId,
+        content: el.content || '',
+        contentType: el.contentType || 'Text',
+        pageName,
+        css: el.css || null
+      });
+      elementIds.push(fieldId);
+    } catch (err) {
+      console.warn(`Error persisting element fieldId ${fieldId}:`, err.message);
+    }
+  }
+
+  return { sectionId, elementIds };
+}
+
+// --- HEALTH CHECK ROUTE ---
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// --- SECTIONS API ROUTES ---
+app.get('/api/sections', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({ ok: true, data: [], warning: "MongoDB disconnected" });
+    }
+    const { pageName } = req.query;
+    const query = pageName ? { pageName } : {};
+    const sections = await Section.find(query);
+    res.json({ ok: true, data: sections });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/sections/:sectionId', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({ ok: true, data: { section: null, elements: [] }, warning: "MongoDB disconnected" });
+    }
+    const section = await Section.findOne({ sectionId: req.params.sectionId });
+    if (!section) {
+      return res.status(404).json({ ok: false, error: "Section not found" });
+    }
+    const elements = await Elements.find({ sectionId: req.params.sectionId });
+    res.json({ ok: true, data: { section, elements } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// --- ELEMENTS API ROUTES ---
 app.get('/api/elements', async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
@@ -75,7 +174,6 @@ app.get('/api/elements', async (req, res) => {
   }
 });
 
-// PATCH route for live content edits
 app.patch('/api/elements/:fieldId', async (req, res) => {
   try {
     const { fieldId } = req.params;
@@ -104,201 +202,187 @@ app.patch('/api/elements/:fieldId', async (req, res) => {
 // --- WIREFRAME GENERATE ROUTE ---
 app.post('/api/generate', upload.single('wireframe'), async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, pageName = 'Home', sectionName = 'Custom' } = req.body;
     const wireframeFile = req.file;
 
     if (!wireframeFile) {
-      return res.status(400).json({
-        ok: false,
-        error: "Please upload a wireframe image."
-      });
+      return res.status(400).json({ ok: false, error: "Please upload a wireframe image." });
     }
 
     const imageBuffer = fs.readFileSync(wireframeFile.path);
     const base64Image = imageBuffer.toString("base64");
 
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `
-You are an expert React frontend developer.
+    // Reserve 10-digit numeric fieldIds server-side
+    const reservedFieldIds = {
+      headlineMain: generateId('2'),
+      subheading: generateId('2'),
+      ctaButton: generateId('2'),
+      featureCard1: generateId('2'),
+      featureCard2: generateId('2'),
+      featureCard3: generateId('2'),
+      heroImage: generateId('2')
+    };
 
-Analyze the uploaded wireframe image and recreate the SINGLE PAGE shown in the wireframe.
+    const payload = {
+      contents: [{
+        parts: [
+          {
+            text: `
+You are an expert React frontend developer building a CMS-bound section.
+
+Analyze the uploaded wireframe image and recreate the SINGLE PAGE section shown.
 
 ${prompt ? `Additional user instructions: ${prompt}` : ""}
 
-Generate a React JSX component that reproduces the wireframe layout.
+MANDATORY CONTRACT — the generated component MUST:
+- Be named GeneratedPage.
+- Declare a top-level "const ids = ${JSON.stringify(reservedFieldIds)};" mapping every editable region to the 10-digit numeric fieldIds provided above.
+- Every editable text/heading node must carry id={ids.semanticName} and className="dynamicStyle".
+- Every image node must carry id={ids.semanticName}, className="dynamicStyle2", and a meaningful alt text.
+- Every CTA button node must carry id={ids.semanticName}, className="dynamicStyle", and aria-label="CTA Action".
+- Use Tailwind CSS utility classes (e.g. flex, grid, p-6, text-center, font-bold, bg-teal-700, text-white) for layout and styling.
+- Do not use Tailwind import statements, markdown code blocks, or export default.
 
-IMPORTANT:
-- The React component MUST be named GeneratedPage.
-- The component must start with: function GeneratedPage() {
-- Do not use Tailwind or external UI libraries.
-- Do not include import/export statements or markdown code blocks.
+Reserved Field IDs to bind (use exactly as given):
+${JSON.stringify(reservedFieldIds, null, 2)}
 
 Return ONLY valid JSON in this exact format:
 {
   "jsx": "complete React component code",
-  "css": "complete CSS styles"
+  "css": "custom CSS rules if required beyond Tailwind",
+  "elements": [
+    { "elementName": "Hero Headline", "fieldId": "${reservedFieldIds.headlineMain}", "contentType": "Text", "content": "Default headline copy" },
+    { "elementName": "Hero Subtitle", "fieldId": "${reservedFieldIds.subheading}", "contentType": "Textfield", "content": "Default subtitle copy" },
+    { "elementName": "CTA Button", "fieldId": "${reservedFieldIds.ctaButton}", "contentType": "Button", "content": "Get Started" },
+    { "elementName": "Feature Card One", "fieldId": "${reservedFieldIds.featureCard1}", "contentType": "Cards", "content": "Feature One Copy" },
+    { "elementName": "Feature Card Two", "fieldId": "${reservedFieldIds.featureCard2}", "contentType": "Cards", "content": "Feature Two Copy" },
+    { "elementName": "Feature Card Three", "fieldId": "${reservedFieldIds.featureCard3}", "contentType": "Cards", "content": "Feature Three Copy" }
+  ]
 }
 `
-            },
-            {
-              inline_data: {
-                mime_type: wireframeFile.mimetype,
-                data: base64Image
-              }
-            }
-          ]
-        }
-      ]
+          },
+          { inline_data: { mime_type: wireframeFile.mimetype, data: base64Image } }
+        ]
+      }]
     };
 
     const text = await callGeminiAPI(payload);
+    const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
 
-    const result = JSON.parse(
-      text.replace(/```json/g, "").replace(/```/g, "").trim()
-    );
+    // Persist Section and Element documents to MongoDB
+    const saved = await persistGeneratedSection({ pageName, sectionName, result, wireframePath: wireframeFile.path });
 
     res.json({
       ok: true,
       jsx: result.jsx,
-      css: result.css || ""
+      css: result.css || "",
+      sectionId: saved.sectionId,
+      elementIds: saved.elementIds
     });
 
   } catch (err) {
     console.error("Generate Error:", err.message);
     const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({
-      ok: false,
-      error: err.message
-    });
-  }
-});
-
-// --- REACT FEATURE MODIFIER ROUTE ---
-app.post('/api/react-feature', async (req, res) => {
-  try {
-    const { code, prompt } = req.body;
-
-    if (!code) {
-      return res.status(400).json({ ok: false, error: "React code is required." });
-    }
-    if (!prompt) {
-      return res.status(400).json({ ok: false, error: "Please provide a prompt." });
-    }
-
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `
-You are an expert React developer.
-
-EXISTING REACT CODE:
-${code}
-
-USER REQUEST:
-${prompt}
-
-Modify the React code according to the request. Keep component name as GeneratedPage or original function name.
-Return ONLY valid JSON in this exact format:
-{
-  "jsx": "complete updated React component code",
-  "css": "updated CSS if required"
-}
-`
-            }
-          ]
-        }
-      ]
-    };
-
-    const text = await callGeminiAPI(payload);
-
-    const result = JSON.parse(
-      text.replace(/```json/g, "").replace(/```/g, "").trim()
-    );
-
-    res.json({
-      ok: true,
-      jsx: result.jsx,
-      css: result.css || ""
-    });
-
-  } catch (err) {
-    console.error("React Feature Error:", err.message);
-    const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({
-      ok: false,
-      error: err.message
-    });
+    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
   }
 });
 
 // --- PROMPT UI GENERATE ROUTE ---
 app.post("/api/prompt-ui", async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, pageName = 'Home', sectionName = 'Custom' } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ ok: false, error: "Prompt is required." });
     }
 
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `
-You are an expert React frontend developer.
+    const reservedFieldIds = {
+      headlineMain: generateId('2'),
+      subheading: generateId('2'),
+      ctaButton: generateId('2'),
+      card1: generateId('2'),
+      card2: generateId('2'),
+      card3: generateId('2')
+    };
 
-Generate a complete React UI based on this user prompt:
+    const payload = {
+      contents: [{
+        parts: [
+          {
+            text: `
+You are an expert React frontend developer building a CMS-bound section.
+
+Generate a complete React UI based on this prompt:
 ${prompt}
 
-IMPORTANT RULES:
-- The component MUST be named GeneratedPage.
-- Start with: function GeneratedPage() {
-- Do NOT use import/export statements or external libraries.
+MANDATORY CONTRACT:
+- Component name: GeneratedPage.
+- Declare "const ids = ${JSON.stringify(reservedFieldIds)};".
+- Every text node must carry id={ids.semanticName} and className="dynamicStyle".
+- Buttons must carry id={ids.semanticName}, className="dynamicStyle", and aria-label.
+- Use Tailwind CSS utility classes for layout, flexbox, grid, and styling.
+- Do NOT use markdown code fences.
 
-Return your response EXACTLY in this format:
+Return EXACTLY in format:
 ===JSX===
 [complete React component code]
 ===CSS===
 [complete CSS code]
+===ELEMENTS===
+[JSON array of element objects with elementName, fieldId, contentType, content]
 `
-            }
-          ]
-        }
-      ]
+          }
+        ]
+      }]
     };
 
     const text = await callGeminiAPI(payload);
 
     const jsxMarker = "===JSX===";
     const cssMarker = "===CSS===";
+    const elementsMarker = "===ELEMENTS===";
 
     const jsxStart = text.indexOf(jsxMarker);
     const cssStart = text.indexOf(cssMarker);
+    const elementsStart = text.indexOf(elementsMarker);
 
-    if (jsxStart === -1 || cssStart === -1) {
-      throw new Error("Gemini returned an invalid response format.");
+    let jsx = "", css = "", elements = [];
+
+    if (jsxStart !== -1 && cssStart !== -1) {
+      jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
+      if (elementsStart !== -1) {
+        css = text.substring(cssStart + cssMarker.length, elementsStart).trim();
+        try {
+          elements = JSON.parse(text.substring(elementsStart + elementsMarker.length).trim());
+        } catch {
+          elements = [];
+        }
+      } else {
+        css = text.substring(cssStart + cssMarker.length).trim();
+      }
+    } else {
+      throw new Error("Gemini returned invalid format.");
     }
 
-    const jsx = text.substring(jsxStart + jsxMarker.length, cssStart).trim();
-    const css = text.substring(cssStart + cssMarker.length).trim();
+    const saved = await persistGeneratedSection({
+      pageName,
+      sectionName,
+      result: { jsx, css, elements },
+      wireframePath: null
+    });
 
-    res.json({ ok: true, jsx, css });
+    res.json({
+      ok: true,
+      jsx,
+      css,
+      sectionId: saved.sectionId,
+      elementIds: saved.elementIds
+    });
 
   } catch (err) {
     console.error("Prompt UI Error:", err.message);
     const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({
-      ok: false,
-      error: err.message
-    });
+    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
   }
 });
 
@@ -315,34 +399,29 @@ app.post("/api/prompt-ui-update", async (req, res) => {
     }
 
     const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `
-You are an expert React frontend developer.
+      contents: [{
+        parts: [
+          {
+            text: `
+You are modifying an existing React UI.
 
-EXISTING REACT CODE:
+EXISTING CODE:
 ${code}
-
-EXISTING CSS:
-${css || ""}
 
 USER REQUEST:
 ${prompt}
 
-Modify the existing UI according to the user's request. Keep component name as GeneratedPage.
+Preserve component name GeneratedPage and className="dynamicStyle". Use Tailwind CSS.
 
-Return response EXACTLY in this format:
+Return response EXACTLY in format:
 ===JSX===
 [complete updated React component]
 ===CSS===
 [complete updated CSS]
 `
-            }
-          ]
-        }
-      ]
+          }
+        ]
+      }]
     };
 
     const text = await callGeminiAPI(payload);
@@ -365,10 +444,44 @@ Return response EXACTLY in this format:
   } catch (err) {
     console.error("Prompt UI Update Error:", err.message);
     const isRateLimit = err.message.includes("429");
-    res.status(isRateLimit ? 429 : 500).json({
-      ok: false,
-      error: err.message
-    });
+    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
+  }
+});
+
+// --- REACT FEATURE ROUTE ---
+app.post('/api/react-feature', async (req, res) => {
+  try {
+    const { code, prompt } = req.body;
+
+    if (!code) return res.status(400).json({ ok: false, error: "React code is required." });
+    if (!prompt) return res.status(400).json({ ok: false, error: "Please provide a prompt." });
+
+    const payload = {
+      contents: [{
+        parts: [
+          {
+            text: `
+Modify the React code according to prompt. Use Tailwind CSS classes. Keep className="dynamicStyle" on text/buttons.
+Return ONLY valid JSON:
+{
+  "jsx": "complete updated React component code",
+  "css": "updated CSS if required"
+}
+`
+          }
+        ]
+      }]
+    };
+
+    const text = await callGeminiAPI(payload);
+    const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+
+    res.json({ ok: true, jsx: result.jsx, css: result.css || "" });
+
+  } catch (err) {
+    console.error("React Feature Error:", err.message);
+    const isRateLimit = err.message.includes("429");
+    res.status(isRateLimit ? 429 : 500).json({ ok: false, error: err.message });
   }
 });
 

@@ -24,7 +24,9 @@ function buildPreviewHTML(jsx, css) {
 
   const safeCode = JSON.stringify(code);
 
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<script src="https://cdn.tailwindcss.com"></script>'
+    + '<style>'
     + 'body{margin:0;font-family:Arial,sans-serif}*{box-sizing:border-box}'
     + (css || '')
     + '</style></head><body><div id="root"></div>'
@@ -56,7 +58,6 @@ export default function PreviewSandbox({ jsx, css, viewport = 'desktop' }) {
               <span className="empty-status-text">Awaiting Generation</span>
             </div>
 
-            {/* Subtle architectural ghost wireframe */}
             <div className="ghost-wireframe">
               <div className="ghost-nav">
                 <div className="ghost-bar" style={{ width: '60px' }} />

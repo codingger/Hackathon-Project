@@ -1,61 +1,63 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchCMSElements, updateCMSElement } from '../services/api';
+import { fetchCMSElements, fetchSectionById, updateCMSElement } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
 
 const DEFAULT_DEMO_ELEMENTS = [
   {
-    fieldId: 'hero_title_1',
+    fieldId: '2082410981',
     elementName: 'Hero Main Headline',
     contentType: 'Text',
     content: 'Build & Evolve React Apps at AI Speed',
     pageName: 'Home',
-    sectionId: 'sec_hero'
+    sectionId: '1082410001'
   },
   {
-    fieldId: 'hero_subtitle_1',
+    fieldId: '2082410982',
     elementName: 'Hero Subtitle',
     contentType: 'Textfield',
     content: 'Transform sketches and prompts into production-ready React components with real-time CMS content management.',
     pageName: 'Home',
-    sectionId: 'sec_hero'
+    sectionId: '1082410001'
   },
   {
-    fieldId: 'hero_cta_btn',
+    fieldId: '2082410983',
     elementName: 'Hero Action Button',
     contentType: 'Button',
     content: 'Explore Studio Modes',
     pageName: 'Home',
-    sectionId: 'sec_hero'
+    sectionId: '1082410001'
   },
   {
-    fieldId: 'feature_card_1',
+    fieldId: '2082410984',
     elementName: 'Feature Card One',
     contentType: 'Cards',
     content: 'Wireframe to Code',
     pageName: 'Home',
-    sectionId: 'sec_features'
+    sectionId: '1082410001'
   },
   {
-    fieldId: 'feature_card_2',
+    fieldId: '2082410985',
     elementName: 'Feature Card Two',
     contentType: 'Cards',
     content: 'Iterative AI Prompts',
     pageName: 'Home',
-    sectionId: 'sec_features'
+    sectionId: '1082410001'
   },
   {
-    fieldId: 'feature_card_3',
+    fieldId: '2082410986',
     elementName: 'Feature Card Three',
     contentType: 'Cards',
     content: 'Realtime MongoDB Sync',
     pageName: 'Home',
-    sectionId: 'sec_features'
+    sectionId: '1082410001'
   }
 ];
 
 export default function CMSStudio() {
   const [pageName, setPageName] = useState('Home');
+  const [sectionId, setSectionId] = useState('');
+  const [sectionMeta, setSectionMeta] = useState(null);
   const [elements, setElements] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,26 +66,46 @@ export default function CMSStudio() {
   const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
 
-  // Load elements from MongoDB backend or fallback to demo items
+  // Read sectionId query param from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('sectionId');
+    if (sid) {
+      setSectionId(sid);
+    }
+  }, []);
+
+  // Load elements from MongoDB section endpoint if sectionId present, or fallback to pageName query
   const loadElements = async () => {
     setLoading(true);
     try {
+      if (sectionId) {
+        const { data } = await fetchSectionById(sectionId);
+        if (data.ok && data.data?.elements && data.data.elements.length > 0) {
+          setElements(data.data.elements);
+          setSectionMeta(data.data.section);
+          setStatusMsg(`Loaded persisted section #${sectionId} from MongoDB`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Default pageName query
       const { data } = await fetchCMSElements(pageName);
       if (data.ok && Array.isArray(data.data) && data.data.length > 0) {
         setElements(data.data);
       } else {
-        // Database is empty or disconnected, use fallback demo elements
-        setElements(DEFAULT_DEMO_ELEMENTS.filter(e => e.pageName === pageName));
+        setElements(DEFAULT_DEMO_ELEMENTS);
       }
     } catch {
-      setElements(DEFAULT_DEMO_ELEMENTS.filter(e => e.pageName === pageName));
+      setElements(DEFAULT_DEMO_ELEMENTS);
     }
     setLoading(false);
   };
 
   useEffect(() => {
     loadElements();
-  }, [pageName]);
+  }, [pageName, sectionId]);
 
   const handleContentChange = (fieldId, newContent) => {
     setElements((prev) =>
@@ -100,7 +122,7 @@ export default function CMSStudio() {
         pageName: element.pageName
       });
       if (data.ok) {
-        setStatusMsg(`Saved "${element.elementName}" successfully!`);
+        setStatusMsg(`Saved "${element.elementName}" (${element.fieldId}) to MongoDB!`);
       } else {
         setStatusMsg(`Updated locally (MongoDB offline)`);
       }
@@ -111,6 +133,7 @@ export default function CMSStudio() {
   };
 
   const seedDemoData = () => {
+    setSectionId('');
     setElements(DEFAULT_DEMO_ELEMENTS);
     setStatusMsg('Demo CMS elements loaded into studio!');
   };
@@ -130,53 +153,59 @@ export default function CMSStudio() {
   const generatedJSX = useMemo(() => {
     if (!elements || elements.length === 0) return '';
 
-    const heroTitle = elements.find((e) => e.fieldId === 'hero_title_1')?.content || 'CMS Studio Page';
-    const heroSubtitle = elements.find((e) => e.fieldId === 'hero_subtitle_1')?.content || 'Manage website content live.';
-    const heroBtn = elements.find((e) => e.fieldId === 'hero_cta_btn')?.content || 'Get Started';
-    const cards = elements.filter((e) => e.contentType === 'Cards');
+    const textElements = elements.filter(e => e.contentType === 'Text' || e.contentType === 'Textfield');
+    const headline = textElements[0]?.content || 'CMS Bound Component';
+    const subtitle = textElements[1]?.content || 'Content persisted directly in MongoDB.';
+    
+    const btnElement = elements.find(e => e.contentType === 'Button');
+    const buttonLabel = btnElement?.content || 'Action CTA';
 
-    const cardItemsJSX = cards
-      .map(
-        (c) => `<div className="cms-card">
-          <div className="cms-card-badge">CMS ITEM</div>
-          <h4>${c.content}</h4>
-          <p>Field ID: <code>${c.fieldId}</code></p>
+    const cardElements = elements.filter(e => e.contentType === 'Cards');
+
+    const cardItemsJSX = cardElements.length > 0
+      ? cardElements
+          .map(
+            (c) => `        <div id="${c.fieldId}" className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="text-xs font-bold text-teal-700 tracking-wider mb-1">FIELD #${c.fieldId}</div>
+          <h4 className="text-base font-semibold text-gray-900">${c.content}</h4>
         </div>`
-      )
-      .join('\n');
+          )
+          .join('\n')
+      : `        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <h4 className="text-base font-semibold text-gray-900">Editable CMS Content Item</h4>
+        </div>`;
 
     return `function GeneratedPage() {
+  const ids = {
+    headline: "${textElements[0]?.fieldId || '2082410981'}",
+    subtitle: "${textElements[1]?.fieldId || '2082410982'}",
+    cta: "${btnElement?.fieldId || '2082410983'}"
+  };
+
   return (
-    <div className="cms-demo-wrapper">
-      <header className="cms-demo-hero">
-        <span className="cms-tag">${pageName.toUpperCase()} PAGE</span>
-        <h1>${heroTitle}</h1>
-        <p>${heroSubtitle}</p>
-        <button className="cms-demo-btn">${heroBtn}</button>
+    <div className="p-8 max-w-4xl mx-auto font-sans text-gray-900">
+      <header className="text-center p-8 bg-amber-50/50 border border-amber-200/60 rounded-xl shadow-sm mb-8">
+        <span className="text-xs font-bold tracking-widest text-teal-800 bg-teal-100/70 px-3 py-1 rounded-full uppercase">
+          ${sectionMeta ? `SECTION #${sectionMeta.sectionId}` : `${pageName.toUpperCase()} PAGE`}
+        </span>
+        <h1 id={ids.headline} className="dynamicStyle text-3xl font-serif font-extrabold mt-4 mb-2 text-gray-900">
+          ${headline}
+        </h1>
+        <p id={ids.subtitle} className="dynamicStyle text-base text-gray-600 max-w-xl mx-auto mb-6 leading-relaxed">
+          ${subtitle}
+        </p>
+        <button id={ids.cta} className="dynamicStyle px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm uppercase tracking-wider rounded-lg shadow-md transition" aria-label="Primary CTA">
+          ${buttonLabel}
+        </button>
       </header>
 
-      <section className="cms-demo-grid">
-        ${cardItemsJSX || '<div className="cms-card"><h4>Editable CMS Content Card</h4></div>'}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+${cardItemsJSX}
       </section>
     </div>
   );
 }`;
-  }, [elements, pageName]);
-
-  const generatedCSS = `
-.cms-demo-wrapper { padding: 40px 24px; max-width: 900px; margin: 0 auto; font-family: Georgia, serif; color: #161c1b; }
-.cms-demo-hero { text-align: center; padding: 40px 20px; background: #fffdf8; border: 1px solid #d6d0c4; border-radius: 8px; box-shadow: 4px 4px 0 #d0ddd8; margin-bottom: 30px; }
-.cms-tag { font: 700 0.65rem system-ui, sans-serif; letter-spacing: 0.12em; color: #2a6f6f; background: rgba(42, 111, 111, 0.1); padding: 3px 8px; border-radius: 4px; }
-.cms-demo-hero h1 { font-size: 2.2rem; margin: 12px 0 8px; color: #161c1b; letter-spacing: -0.02em; }
-.cms-demo-hero p { font-size: 1.05rem; color: #5c5952; max-width: 580px; margin: 0 auto 20px; line-height: 1.5; }
-.cms-demo-btn { padding: 12px 24px; font: 700 0.8rem system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; background: #2a6f6f; color: #fff; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 12px rgba(42, 111, 111, 0.25); }
-.cms-demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-.cms-card { background: #fffdf8; border: 1px solid #d6d0c4; border-radius: 8px; padding: 20px; text-align: center; }
-.cms-card-badge { font: 700 0.6rem system-ui, sans-serif; color: #8a847a; letter-spacing: 0.08em; margin-bottom: 6px; }
-.cms-card h4 { margin: 4px 0; font-size: 1.1rem; color: #161c1b; }
-.cms-card p { font-size: 0.75rem; color: #8a847a; margin: 4px 0 0; }
-.cms-card code { background: #ebe6db; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
-`;
+  }, [elements, pageName, sectionMeta]);
 
   return (
     <div className="workspace-wrapper">
@@ -188,6 +217,11 @@ export default function CMSStudio() {
             <div className="blueprint-header">
               <span className="eyebrow">CONTENT MANAGEMENT SYSTEM</span>
               <h2>Live CMS<br /><em>content editor.</em></h2>
+              {sectionId && (
+                <span className="dropzone-sublabel" style={{ color: '#2a6f6f', fontWeight: 'bold' }}>
+                  📌 Active Section ID: #{sectionId}
+                </span>
+              )}
             </div>
 
             <div className="cms-controls-bar">
@@ -196,7 +230,7 @@ export default function CMSStudio() {
                 <select 
                   className="field-input" 
                   value={pageName} 
-                  onChange={(e) => setPageName(e.target.value)}
+                  onChange={(e) => { setSectionId(''); setPageName(e.target.value); }}
                 >
                   <option value="Home">Home Page</option>
                   <option value="Landing">Landing Page</option>
@@ -220,10 +254,10 @@ export default function CMSStudio() {
 
             <div className="cms-elements-list">
               {loading ? (
-                <div className="cms-empty-state">Loading CMS elements from database...</div>
+                <div className="cms-empty-state">Loading CMS elements from MongoDB...</div>
               ) : filteredElements.length === 0 ? (
                 <div className="cms-empty-state">
-                  <p>No elements found for page "{pageName}".</p>
+                  <p>No elements found.</p>
                   <button type="button" className="preset-chip" onClick={seedDemoData} style={{ marginTop: '0.8rem' }}>
                     + Load Demo Page Elements
                   </button>
@@ -322,7 +356,7 @@ export default function CMSStudio() {
           </header>
 
           <div className="stage-body">
-            {tab === 'preview' && <PreviewSandbox jsx={generatedJSX} css={generatedCSS} viewport={viewport} />}
+            {tab === 'preview' && <PreviewSandbox jsx={generatedJSX} css="" viewport={viewport} />}
             {tab === 'json' && (
               <CodeViewer 
                 code={JSON.stringify(elements, null, 2)} 

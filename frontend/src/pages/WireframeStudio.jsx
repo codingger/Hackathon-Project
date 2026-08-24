@@ -12,37 +12,40 @@ const PRESETS = [
 ];
 
 const DEMO_WIREFRAME_JSX = `function GeneratedPage() {
+  const ids = {
+    headlineMain: "2082410981",
+    subheading: "2082410982",
+    ctaButton: "2082410983"
+  };
+
   return (
-    <div style={{ padding: "40px", maxWidth: "960px", margin: "0 auto", fontFamily: "Georgia, serif", color: "#161c1b" }}>
-      <header style={{ textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.1em", color: "#2a6f6f", marginBottom: "8px", fontWeight: "bold" }}>
-        PRECISION COFFEE GRINDER — DEMO PRESET
-      </header>
-      <h1 style={{ fontSize: "2.4rem", margin: "0 0 12px 0", letterSpacing: "-0.02em" }}>
-        Crafted for Coffee Connoisseurs
-      </h1>
-      <p style={{ fontSize: "1.1rem", color: "#5c5952", maxWidth: "600px", lineHeight: "1.6", marginBottom: "24px" }}>
-        Experience uniform extraction with stepless ceramic burrs and ultra-quiet motor engineering.
-      </p>
-      <div style={{ display: "flex", gap: "12px", marginBottom: "40px" }}>
-        <button style={{ padding: "12px 24px", background: "#2a6f6f", color: "#ffffff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
+    <div className="p-8 max-w-4xl mx-auto font-sans text-gray-900">
+      <header className="text-center p-8 bg-amber-50/50 border border-amber-200/60 rounded-xl shadow-sm mb-8">
+        <span className="text-xs font-bold tracking-widest text-teal-800 bg-teal-100/70 px-3 py-1 rounded-full uppercase">
+          PRECISION COFFEE GRINDER — DEMO PRESET
+        </span>
+        <h1 id={ids.headlineMain} className="dynamicStyle text-3xl font-serif font-extrabold mt-4 mb-2 text-gray-900">
+          Crafted for Coffee Connoisseurs
+        </h1>
+        <p id={ids.subheading} className="dynamicStyle text-base text-gray-600 max-w-xl mx-auto mb-6 leading-relaxed">
+          Experience uniform extraction with stepless ceramic burrs and ultra-quiet motor engineering.
+        </p>
+        <button id={ids.ctaButton} className="dynamicStyle px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm uppercase tracking-wider rounded-lg shadow-md transition" aria-label="Order Now CTA">
           Order Now — $249
         </button>
-        <button style={{ padding: "12px 24px", background: "transparent", color: "#161c1b", border: "1px solid #d6d0c4", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-          Explore Specifications
-        </button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
-        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
-          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Ceramic Burrs</h3>
-          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Zero heat transfer during grinding.</p>
+      </header>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <h3 className="font-bold text-gray-900 mb-1">Ceramic Burrs</h3>
+          <p className="text-xs text-gray-600">Zero heat transfer during grinding.</p>
         </div>
-        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
-          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Stepless Dial</h3>
-          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Micron-level espresso precision.</p>
+        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <h3 className="font-bold text-gray-900 mb-1">Stepless Dial</h3>
+          <p className="text-xs text-gray-600">Micron-level espresso precision.</p>
         </div>
-        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
-          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Whisper Quiet</h3>
-          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Low-RPM high-torque motor.</p>
+        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <h3 className="font-bold text-gray-900 mb-1">Whisper Quiet</h3>
+          <p className="text-xs text-gray-600">Low-RPM high-torque motor.</p>
         </div>
       </div>
     </div>
@@ -55,10 +58,11 @@ export default function WireframeStudio() {
   const [refinePrompt, setRefinePrompt] = useState('');
   const [jsx, setJsx] = useState('');
   const [css, setCss] = useState('');
+  const [sectionId, setSectionId] = useState('');
   const [loading, setLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('preview'); // 'preview' | 'editor' | 'jsx' | 'css'
+  const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
 
   const canGenerate = !loading && !!file;
@@ -76,6 +80,7 @@ export default function WireframeStudio() {
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
+      setSectionId(data.sectionId || '');
       setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
@@ -86,6 +91,7 @@ export default function WireframeStudio() {
   const loadInstantDemo = () => {
     setJsx(DEMO_WIREFRAME_JSX);
     setCss('');
+    setSectionId('1082410001');
     setError('');
     setTab('editor');
   };
@@ -208,7 +214,6 @@ export default function WireframeStudio() {
                 )}
               </div>
 
-              {/* Instant Demo Bypass Button when Gemini Rate Limit (429) occurs */}
               {error && (
                 <div className="error-msg">
                   <div>{error}</div>
@@ -257,6 +262,15 @@ export default function WireframeStudio() {
             </div>
 
             <div className="stage-actions">
+              {sectionId && (
+                <a 
+                  href={`/cms?sectionId=${sectionId}`}
+                  className="preset-chip" 
+                  style={{ background: '#2a6f6f', color: '#fff', textDecoration: 'none', border: 'none' }}
+                >
+                  ⚙️ Open in CMS Studio (#{sectionId})
+                </a>
+              )}
               <div className="viewport-toggles">
                 <button 
                   className={`viewport-btn ${viewport === 'desktop' ? 'active' : ''}`} 
