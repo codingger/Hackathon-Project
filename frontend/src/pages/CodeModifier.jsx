@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { modifyReactCode, updatePromptUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
+import VisualElementEditor from '../components/VisualElementEditor';
 
 const EXAMPLE_COMPONENT = `function MyHero() {
   const [count, setCount] = React.useState(0);
@@ -30,7 +31,7 @@ export default function CodeModifier() {
   const [loading, setLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('preview');
+  const [tab, setTab] = useState('preview'); // 'preview' | 'editor' | 'jsx' | 'css'
   const [viewport, setViewport] = useState('desktop');
 
   const hasCode = code.trim().length > 0;
@@ -44,13 +45,12 @@ export default function CodeModifier() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       setCode(ev.target.result || '');
-      setResultJsx(''); // Reset previously evolved state on new file upload
+      setResultJsx('');
       setResultCss('');
     };
     reader.readAsText(f);
   };
 
-  // Initial code evolution
   const apply = async (e) => {
     e.preventDefault();
     if (!hasCode) { setError('Please paste or upload React code first.'); return; }
@@ -65,14 +65,13 @@ export default function CodeModifier() {
       if (!data.ok) throw new Error(data.error);
       setResultJsx(data.jsx);
       setResultCss(data.css || '');
-      setTab('preview');
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
     setLoading(false);
   };
 
-  // Iterative prompt tweak on the CURRENT evolved component
   const refine = async (e) => {
     e.preventDefault();
     if (!refinePrompt.trim()) return;
@@ -85,7 +84,7 @@ export default function CodeModifier() {
       setResultJsx(data.jsx);
       setResultCss(data.css || '');
       setRefinePrompt('');
-      setTab('preview');
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -99,7 +98,7 @@ export default function CodeModifier() {
     <div className="workspace-wrapper">
       <div className="workspace">
         
-        {/* Left Panel: Component Evolution Blueprint */}
+        {/* Left Panel: Component Evolution Blueprint & Hand Editor */}
         <section className="blueprint-panel">
           <div className="blueprint-card">
             <div className="blueprint-header">
@@ -108,8 +107,6 @@ export default function CodeModifier() {
             </div>
 
             <form onSubmit={apply} className="blueprint-form">
-              
-              {/* Input Mode Toggle */}
               <div className="field-group">
                 <div className="input-mode-toggle">
                   <button 
@@ -137,9 +134,7 @@ export default function CodeModifier() {
                     <textarea 
                       className="code-textarea"
                       value={code} 
-                      onChange={(e) => {
-                        setCode(e.target.value);
-                      }} 
+                      onChange={(e) => setCode(e.target.value)} 
                       rows="7" 
                       placeholder="Paste your React component JSX here..." 
                       spellCheck="false"
@@ -204,27 +199,10 @@ export default function CodeModifier() {
             </form>
           </div>
 
-          {/* Prompt Tweaking Card on Current UI */}
-          {resultJsx && (
-            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
-              <div className="blueprint-header">
-                <span className="eyebrow">TWEAK CURRENT UI</span>
-                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Write message to AI</h3>
-              </div>
-              <form onSubmit={refine} className="blueprint-form">
-                <div className="field-group">
-                  <textarea 
-                    className="field-textarea"
-                    value={refinePrompt} 
-                    onChange={(e) => setRefinePrompt(e.target.value)} 
-                    rows="3" 
-                    placeholder="Tell the AI what to add or tweak on the current UI (e.g. Add a contact form below, make buttons dark green...)" 
-                  />
-                </div>
-                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
-                  {refining ? 'Updating Current UI...' : 'Update Current UI'}
-                </button>
-              </form>
+          {/* Direct Hand Editor Card once generated */}
+          {displayCode && (
+            <div className="blueprint-card">
+              <VisualElementEditor jsx={displayCode} onJsxChange={resultJsx ? setResultJsx : setCode} />
             </div>
           )}
         </section>
@@ -238,6 +216,12 @@ export default function CodeModifier() {
                 onClick={() => setTab('preview')}
               >
                 Live Preview
+              </button>
+              <button 
+                className={`stage-tab ${tab === 'editor' ? 'active' : ''}`} 
+                onClick={() => setTab('editor')}
+              >
+                ✏️ Visual Hand Editor
               </button>
               <button 
                 className={`stage-tab ${tab === 'jsx' ? 'active' : ''}`} 
@@ -274,8 +258,15 @@ export default function CodeModifier() {
           </header>
 
           <div className="stage-body">
-            {/* Show skeleton state until user applies changes, or render evolved JSX */}
             {tab === 'preview' && <PreviewSandbox jsx={resultJsx} css={resultCss} viewport={viewport} />}
+            {tab === 'editor' && (
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <VisualElementEditor jsx={displayCode} onJsxChange={resultJsx ? setResultJsx : setCode} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <PreviewSandbox jsx={resultJsx || code} css={resultCss} viewport={viewport} />
+                </div>
+              </div>
+            )}
             {tab === 'jsx' && <CodeViewer code={displayCode} label={displayLabel} />}
             {tab === 'css' && <CodeViewer code={resultCss} label="Styles (CSS)" />}
           </div>
@@ -286,7 +277,7 @@ export default function CodeModifier() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Message AI to tweak current UI: e.g. Add a navbar logo, change font to sans-serif..." 
+                placeholder="Message AI to tweak current UI, or edit text boxes above directly with your own hands..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
                 {refining ? 'Updating...' : 'Tweak Current UI'}

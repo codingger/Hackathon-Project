@@ -875,6 +875,98 @@ body {
   border-radius: 6px;
 }
 
+/* ── Visual Hand Editor Styles ── */
+.visual-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 320px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-color);
+  padding: 0.9rem;
+}
+
+.visual-editor-header h3 {
+  font-size: 1.1rem;
+  margin: 0.2rem 0;
+  color: var(--text-main);
+}
+
+.visual-editor-count {
+  font: 700 0.65rem system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+}
+
+.visual-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.visual-element-box {
+  background: var(--bg-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.visual-element-box:hover,
+.visual-element-box.active {
+  border-color: var(--accent-color);
+  background: #ffffff;
+  box-shadow: 0 2px 8px var(--accent-subtle);
+}
+
+.visual-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tag-badge {
+  font: 700 0.6rem system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.tag-badge-heading {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tag-badge-btn {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.tag-badge-text {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.visual-box-id {
+  font: 600 0.65rem monospace;
+  color: var(--text-faint);
+}
+
+.visual-editor-empty {
+  padding: 1rem;
+  font: italic 0.85rem Georgia, serif;
+  color: var(--text-faint);
+  text-align: center;
+}
+
 /* ── Responsive ── */
 @media (max-width: 960px) {
   .workspace {

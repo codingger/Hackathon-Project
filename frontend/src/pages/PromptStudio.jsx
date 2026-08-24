@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { generateFromPrompt, updatePromptUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
+import VisualElementEditor from '../components/VisualElementEditor';
 
 const INSPIRATIONS = [
   'SaaS Landing Page with Pricing',
@@ -18,10 +19,9 @@ export default function PromptStudio() {
   const [loading, setLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('preview');
+  const [tab, setTab] = useState('preview'); // 'preview' | 'editor' | 'jsx' | 'css'
   const [viewport, setViewport] = useState('desktop');
 
-  // Require meaningful input: at least 8 characters and at least 2 words
   const isMeaningfulPrompt = prompt.trim().length >= 8 && prompt.trim().split(/\s+/).filter(Boolean).length >= 2;
   const canGenerate = !loading && isMeaningfulPrompt;
 
@@ -38,7 +38,8 @@ export default function PromptStudio() {
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
-      setTab('preview');
+      // Auto-switch to Hand Editor mode upon generation!
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -56,7 +57,7 @@ export default function PromptStudio() {
       setJsx(data.jsx);
       setCss(data.css || '');
       setRefinePrompt('');
-      setTab('preview');
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -67,7 +68,7 @@ export default function PromptStudio() {
     <div className="workspace-wrapper">
       <div className="workspace">
         
-        {/* Left Panel: Prompt Composer */}
+        {/* Left Panel: Prompt Composer & Hand Editor */}
         <section className="blueprint-panel">
           <div className="blueprint-card">
             <div className="blueprint-header">
@@ -121,27 +122,10 @@ export default function PromptStudio() {
             </form>
           </div>
 
-          {/* Tweak / Update UI Section (Nikunj's Prompt Update feature) */}
+          {/* Direct Hand Editor Card once generated */}
           {jsx && (
-            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
-              <div className="blueprint-header">
-                <span className="eyebrow">UPDATE GENERATED UI</span>
-                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Tweak UI with Prompts</h3>
-              </div>
-              <form onSubmit={refine} className="blueprint-form">
-                <div className="field-group">
-                  <textarea 
-                    className="field-textarea"
-                    value={refinePrompt} 
-                    onChange={(e) => setRefinePrompt(e.target.value)} 
-                    rows="3" 
-                    placeholder="e.g. Add a pricing section below the features, make buttons dark green..." 
-                  />
-                </div>
-                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
-                  {refining ? 'Applying Changes...' : 'Apply Prompt Changes'}
-                </button>
-              </form>
+            <div className="blueprint-card">
+              <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
             </div>
           )}
         </section>
@@ -155,6 +139,12 @@ export default function PromptStudio() {
                 onClick={() => setTab('preview')}
               >
                 Live Preview
+              </button>
+              <button 
+                className={`stage-tab ${tab === 'editor' ? 'active' : ''}`} 
+                onClick={() => setTab('editor')}
+              >
+                ✏️ Visual Hand Editor
               </button>
               <button 
                 className={`stage-tab ${tab === 'jsx' ? 'active' : ''}`} 
@@ -192,6 +182,14 @@ export default function PromptStudio() {
 
           <div className="stage-body">
             {tab === 'preview' && <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />}
+            {tab === 'editor' && (
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />
+                </div>
+              </div>
+            )}
             {tab === 'jsx' && <CodeViewer code={jsx} label="Generated React JSX" />}
             {tab === 'css' && <CodeViewer code={css} label="Generated CSS" />}
           </div>
@@ -202,10 +200,10 @@ export default function PromptStudio() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Refine: e.g. Make the CTA button larger, change accent color to muted teal..." 
+                placeholder="Message AI for prompt tweaks, or edit text boxes above directly with your own hands..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
-                {refining ? 'Updating...' : 'Refine UI'}
+                {refining ? 'Updating...' : 'Tweak Current UI'}
               </button>
             </form>
           )}

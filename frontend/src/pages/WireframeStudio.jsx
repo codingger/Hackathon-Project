@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { generateFromWireframe, updatePromptUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
+import VisualElementEditor from '../components/VisualElementEditor';
 
 const PRESETS = [
   'E-commerce Hero with Cards',
@@ -19,7 +20,7 @@ export default function WireframeStudio() {
   const [loading, setLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('preview');
+  const [tab, setTab] = useState('preview'); // 'preview' | 'editor' | 'jsx' | 'css'
   const [viewport, setViewport] = useState('desktop');
 
   const canGenerate = !loading && !!file;
@@ -37,7 +38,8 @@ export default function WireframeStudio() {
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
-      setTab('preview');
+      // Auto-switch to Hand Editor mode upon generation!
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -50,13 +52,12 @@ export default function WireframeStudio() {
     setRefining(true);
     setError('');
     try {
-      // Passes current JSX & CSS to modify the existing UI directly in place
       const { data } = await updatePromptUI(jsx, css, refinePrompt);
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
       setRefinePrompt('');
-      setTab('preview');
+      setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -74,7 +75,7 @@ export default function WireframeStudio() {
     <div className="workspace-wrapper">
       <div className="workspace">
         
-        {/* Left Panel: Blueprint */}
+        {/* Left Panel: Blueprint & Direct Editor */}
         <section className="blueprint-panel">
           <div className="blueprint-card">
             <div className="blueprint-header">
@@ -167,27 +168,10 @@ export default function WireframeStudio() {
             </form>
           </div>
 
-          {/* Tweak / Refine Section on Current UI */}
+          {/* Direct Hand-Editor Card once generated */}
           {jsx && (
-            <div className="blueprint-card" style={{ marginTop: '1rem' }}>
-              <div className="blueprint-header">
-                <span className="eyebrow">TWEAK CURRENT UI</span>
-                <h3 style={{ fontSize: '1.2rem', margin: '0.2rem 0', color: 'var(--text-main)' }}>Message AI to Tweak Current UI</h3>
-              </div>
-              <form onSubmit={refine} className="blueprint-form">
-                <div className="field-group">
-                  <textarea 
-                    className="field-textarea"
-                    value={refinePrompt} 
-                    onChange={(e) => setRefinePrompt(e.target.value)} 
-                    rows="3" 
-                    placeholder="Tell the AI what to add or tweak on the current UI (e.g. Add a pricing section below the features, change button to teal...)" 
-                  />
-                </div>
-                <button type="submit" className="action-btn" disabled={refining || !refinePrompt.trim()}>
-                  {refining ? 'Updating Current UI...' : 'Update Current UI'}
-                </button>
-              </form>
+            <div className="blueprint-card">
+              <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
             </div>
           )}
         </section>
@@ -201,6 +185,12 @@ export default function WireframeStudio() {
                 onClick={() => setTab('preview')}
               >
                 Live Preview
+              </button>
+              <button 
+                className={`stage-tab ${tab === 'editor' ? 'active' : ''}`} 
+                onClick={() => setTab('editor')}
+              >
+                ✏️ Visual Hand Editor
               </button>
               <button 
                 className={`stage-tab ${tab === 'jsx' ? 'active' : ''}`} 
@@ -238,6 +228,14 @@ export default function WireframeStudio() {
 
           <div className="stage-body">
             {tab === 'preview' && <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />}
+            {tab === 'editor' && (
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />
+                </div>
+              </div>
+            )}
             {tab === 'jsx' && <CodeViewer code={jsx} label="React JSX Component" />}
             {tab === 'css' && <CodeViewer code={css} label="Styles (CSS)" />}
           </div>
@@ -248,7 +246,7 @@ export default function WireframeStudio() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Message AI to tweak current UI: e.g. Add a pricing section below, change button to teal..." 
+                placeholder="Message AI for prompt tweaks, or edit text boxes above directly with your own hands..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
                 {refining ? 'Updating...' : 'Tweak Current UI'}
