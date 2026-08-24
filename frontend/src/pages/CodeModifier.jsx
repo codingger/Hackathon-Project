@@ -98,7 +98,7 @@ export default function CodeModifier() {
     <div className="workspace-wrapper">
       <div className="workspace">
         
-        {/* Left Panel: Component Evolution Blueprint & Hand Editor */}
+        {/* Left Panel: Component Evolution Blueprint */}
         <section className="blueprint-panel">
           <div className="blueprint-card">
             <div className="blueprint-header">
@@ -198,16 +198,9 @@ export default function CodeModifier() {
               {error && <div className="error-msg">{error}</div>}
             </form>
           </div>
-
-          {/* Direct Hand Editor Card once generated */}
-          {displayCode && (
-            <div className="blueprint-card">
-              <VisualElementEditor jsx={displayCode} onJsxChange={resultJsx ? setResultJsx : setCode} />
-            </div>
-          )}
         </section>
 
-        {/* Right Panel: Live Evolved Preview */}
+        {/* Right Panel: Live Evolved Preview with Integrated Hand Editor */}
         <section className="live-stage">
           <header className="stage-header">
             <div className="stage-tabs">
@@ -260,9 +253,9 @@ export default function CodeModifier() {
           <div className="stage-body">
             {tab === 'preview' && <PreviewSandbox jsx={resultJsx} css={resultCss} viewport={viewport} />}
             {tab === 'editor' && (
-              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <div className="integrated-editor-layout">
                 <VisualElementEditor jsx={displayCode} onJsxChange={resultJsx ? setResultJsx : setCode} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div className="integrated-editor-preview">
                   <PreviewSandbox jsx={resultJsx || code} css={resultCss} viewport={viewport} />
                 </div>
               </div>
@@ -277,7 +270,7 @@ export default function CodeModifier() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Message AI to tweak current UI, or edit text boxes above directly with your own hands..." 
+                placeholder="Message AI to tweak current UI, or edit text boxes directly in Visual Hand Editor above..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
                 {refining ? 'Updating...' : 'Tweak Current UI'}

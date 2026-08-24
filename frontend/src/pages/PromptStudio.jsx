@@ -38,7 +38,6 @@ export default function PromptStudio() {
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
-      // Auto-switch to Hand Editor mode upon generation!
       setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
@@ -68,7 +67,7 @@ export default function PromptStudio() {
     <div className="workspace-wrapper">
       <div className="workspace">
         
-        {/* Left Panel: Prompt Composer & Hand Editor */}
+        {/* Left Panel: Prompt Composer */}
         <section className="blueprint-panel">
           <div className="blueprint-card">
             <div className="blueprint-header">
@@ -121,16 +120,9 @@ export default function PromptStudio() {
               {error && <div className="error-msg">{error}</div>}
             </form>
           </div>
-
-          {/* Direct Hand Editor Card once generated */}
-          {jsx && (
-            <div className="blueprint-card">
-              <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
-            </div>
-          )}
         </section>
 
-        {/* Right Panel: Live Stage */}
+        {/* Right Panel: Live Stage with Integrated Hand Editor */}
         <section className="live-stage">
           <header className="stage-header">
             <div className="stage-tabs">
@@ -183,9 +175,9 @@ export default function PromptStudio() {
           <div className="stage-body">
             {tab === 'preview' && <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />}
             {tab === 'editor' && (
-              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <div className="integrated-editor-layout">
                 <VisualElementEditor jsx={jsx} onJsxChange={setJsx} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div className="integrated-editor-preview">
                   <PreviewSandbox jsx={jsx} css={css} viewport={viewport} />
                 </div>
               </div>
@@ -200,7 +192,7 @@ export default function PromptStudio() {
                 className="refine-input"
                 value={refinePrompt} 
                 onChange={(e) => setRefinePrompt(e.target.value)} 
-                placeholder="Message AI for prompt tweaks, or edit text boxes above directly with your own hands..." 
+                placeholder="Message AI for prompt tweaks, or switch to Visual Hand Editor above to edit text boxes directly..." 
               />
               <button type="submit" className="refine-btn" disabled={refining || !refinePrompt.trim()}>
                 {refining ? 'Updating...' : 'Tweak Current UI'}

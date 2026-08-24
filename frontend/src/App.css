@@ -875,7 +875,22 @@ body {
   border-radius: 6px;
 }
 
-/* ── Visual Hand Editor Styles ── */
+/* ── Integrated Visual Hand Editor Layout inside Stage ── */
+.integrated-editor-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.integrated-editor-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* ── Visual Hand Editor Sidebar Styles ── */
 .visual-editor-container {
   display: flex;
   flex-direction: column;
