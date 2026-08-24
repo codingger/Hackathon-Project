@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 
-const VIEWPORTS = { desktop: '100%', mobile: '375px' };
+const VIEWPORTS = {
+  desktop: '100%',
+  tablet: '768px',
+  mobile: '375px'
+};
 
 function buildPreviewHTML(jsx, css) {
   if (!jsx) return '';
@@ -25,9 +29,10 @@ function buildPreviewHTML(jsx, css) {
   const safeCode = JSON.stringify(code);
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
     + '<script src="https://cdn.tailwindcss.com"></script>'
     + '<style>'
-    + 'body{margin:0;font-family:Arial,sans-serif}*{box-sizing:border-box}'
+    + 'body{margin:0;font-family:Arial,sans-serif;overflow-x:hidden}*{box-sizing:border-box}'
     + (css || '')
     + '</style></head><body><div id="root"></div>'
     + '<script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>'
@@ -51,17 +56,17 @@ export default function PreviewSandbox({ jsx, css, viewport = 'desktop' }) {
   if (!jsx) {
     return (
       <div className="preview-sandbox">
-        <div className="preview-frame-wrapper">
-          <div className={`preview-empty-card ${viewport === 'mobile' ? 'mobile' : ''}`}>
+        <div className={`preview-frame-wrapper viewport-${viewport}`}>
+          <div className={`preview-empty-card ${viewport}`}>
             <div className="empty-card-header">
-              <span className="empty-tag">Live Canvas</span>
+              <span className="empty-tag">Live Canvas ({viewport.toUpperCase()})</span>
               <span className="empty-status-text">Awaiting Generation</span>
             </div>
 
             <div className="ghost-wireframe">
               <div className="ghost-nav">
-                <div className="ghost-bar" style={{ width: '60px' }} />
-                <div className="ghost-bar" style={{ width: '120px' }} />
+                <div className="ghost-bar" style={{ width: '80px' }} />
+                <div className="ghost-bar" style={{ width: '160px' }} />
               </div>
 
               <div className="ghost-hero">
@@ -89,13 +94,21 @@ export default function PreviewSandbox({ jsx, css, viewport = 'desktop' }) {
 
   return (
     <div className="preview-sandbox">
-      <div className="preview-frame-wrapper">
-        <iframe
-          title="Live Preview"
-          srcDoc={html}
-          style={{ width: VIEWPORTS[viewport] || '100%', border: 'none', transition: 'width 0.3s ease' }}
-          sandbox="allow-scripts"
-        />
+      <div className={`preview-frame-wrapper viewport-${viewport}`}>
+        <div className={`device-container ${viewport}`}>
+          {viewport === 'mobile' && (
+            <div className="phone-notch">
+              <div className="phone-camera"></div>
+              <div className="phone-speaker"></div>
+            </div>
+          )}
+          <iframe
+            title="Live Preview"
+            srcDoc={html}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            sandbox="allow-scripts"
+          />
+        </div>
       </div>
     </div>
   );

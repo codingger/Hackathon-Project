@@ -89,18 +89,18 @@ body {
 
 /* ── Workspace Split Pane ── */
 .workspace-wrapper {
-  max-width: 1480px;
+  max-width: 1760px;
   margin: 0 auto;
-  padding: 1.5rem 2rem 2rem;
+  padding: 1.2rem 1.8rem 2rem;
   width: 100%;
 }
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(370px, 440px) minmax(0, 1fr);
-  gap: 2.2rem;
+  grid-template-columns: 410px minmax(0, 1fr);
+  gap: 1.8rem;
   align-items: stretch;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 110px);
 }
 
 /* ── Blueprint Panel (Left) ── */
@@ -548,7 +548,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 480px;
+  min-height: 540px;
 }
 
 .preview-frame-wrapper {
@@ -559,17 +559,75 @@ body {
   background-color: #ebe7dc;
   background-image: radial-gradient(#cfc8b8 1.2px, transparent 1.2px);
   background-size: 16px 16px;
-  padding: 1.2rem;
+  padding: 1.5rem;
   overflow: auto;
+  min-height: 640px;
 }
 
-.preview-frame-wrapper iframe {
+/* Device Containers for Desktop vs Mobile Mockup */
+.device-container {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: #ffffff;
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   height: 100%;
-  min-height: 520px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  min-height: 620px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.device-container.desktop {
+  width: 100%;
+}
+
+.device-container.tablet {
+  width: 768px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.device-container.mobile {
+  width: 375px;
+  height: 720px;
+  min-height: 720px;
+  margin: 0 auto;
+  border-radius: 36px;
+  border: 12px solid #1c2423;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  padding-top: 24px;
+}
+
+/* Mobile Phone Notch */
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 130px;
+  height: 22px;
+  background: #1c2423;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.phone-camera {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0d1211;
+}
+
+.phone-speaker {
+  width: 35px;
+  height: 4px;
+  border-radius: 2px;
+  background: #273331;
 }
 
 /* ── Ghost Skeleton Blueprint Empty State (Expanded & Responsive) ── */
