@@ -21,12 +21,17 @@ app.use('/storage', express.static('uploads'));
 
 const upload = multer({ dest: 'uploads/' });
 
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.set('bufferCommands', false);
+mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 3000 })
   .then(() => console.log("Connected to MongoDB successfully."))
-  .catch((err) => console.log("MongoDB connection error:", err));
+  .catch((err) => console.warn("MongoDB connection warning:", err.message));
 
 app.get('/api/elements', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      // ponytail: return empty data fallback if MongoDB atlas connection is offline/unreachable
+      return res.json({ ok: true, data: [], warning: "MongoDB disconnected" });
+    }
     const { pageName, sectionId } = req.query;
     let query = {};
     if (pageName) query.pageName = pageName;
