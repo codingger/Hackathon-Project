@@ -68,7 +68,6 @@ async function persistGeneratedSection({ pageName = 'Home', sectionName = 'Custo
   let sectionId = generateId('1');
   let section = null;
 
-  // Retry once if 10-digit ID collision occurs
   try {
     section = await Section.create({
       sectionId,
@@ -146,9 +145,6 @@ app.get('/api/sections/:sectionId', async (req, res) => {
       return res.json({ ok: true, data: { section: null, elements: [] }, warning: "MongoDB disconnected" });
     }
     const section = await Section.findOne({ sectionId: req.params.sectionId });
-    if (!section) {
-      return res.status(404).json({ ok: false, error: "Section not found" });
-    }
     const elements = await Elements.find({ sectionId: req.params.sectionId });
     res.json({ ok: true, data: { section, elements } });
   } catch (err) {
@@ -174,23 +170,35 @@ app.get('/api/elements', async (req, res) => {
   }
 });
 
+// PATCH /api/elements/:fieldId with UPSERT support
 app.patch('/api/elements/:fieldId', async (req, res) => {
   try {
     const { fieldId } = req.params;
-    const { content, css, pageName } = req.body;
+    const { content, css, pageName, sectionId, elementName, contentType } = req.body;
 
-    let updateData = {};
+    let updateData = { fieldId, pageName: pageName || 'Home' };
     if (content !== undefined) updateData.content = content;
     if (css !== undefined) updateData.css = css;
+    if (sectionId !== undefined) updateData.sectionId = sectionId;
+    if (elementName !== undefined) updateData.elementName = elementName;
+    if (contentType !== undefined) updateData.contentType = contentType;
 
     const updatedElement = await Elements.findOneAndUpdate(
-      { fieldId, pageName: pageName || 'Home' },
+      { fieldId },
       { $set: updateData },
-      { new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    if (!updatedElement) {
-      return res.status(404).json({ ok: false, error: "Element not found" });
+    if (sectionId) {
+      try {
+        await Section.findOneAndUpdate(
+          { sectionId },
+          { $setOnInsert: { sectionId, sectionName: 'Custom Section', pageName: pageName || 'Home', isGenerated: true, variations: "1" } },
+          { upsert: true }
+        );
+      } catch (secErr) {
+        console.warn("Section upsert warning:", secErr.message);
+      }
     }
 
     res.json({ ok: true, data: updatedElement });
@@ -212,15 +220,13 @@ app.post('/api/generate', upload.single('wireframe'), async (req, res) => {
     const imageBuffer = fs.readFileSync(wireframeFile.path);
     const base64Image = imageBuffer.toString("base64");
 
-    // Reserve 10-digit numeric fieldIds server-side
     const reservedFieldIds = {
       headlineMain: generateId('2'),
       subheading: generateId('2'),
       ctaButton: generateId('2'),
       featureCard1: generateId('2'),
       featureCard2: generateId('2'),
-      featureCard3: generateId('2'),
-      heroImage: generateId('2')
+      featureCard3: generateId('2')
     };
 
     const payload = {
@@ -234,26 +240,22 @@ Analyze the uploaded wireframe image and recreate the SINGLE PAGE section shown.
 
 ${prompt ? `Additional user instructions: ${prompt}` : ""}
 
-MANDATORY CONTRACT — the generated component MUST:
-- Be named GeneratedPage.
-- Declare a top-level "const ids = ${JSON.stringify(reservedFieldIds)};" mapping every editable region to the 10-digit numeric fieldIds provided above.
-- Every editable text/heading node must carry id={ids.semanticName} and className="dynamicStyle".
-- Every image node must carry id={ids.semanticName}, className="dynamicStyle2", and a meaningful alt text.
-- Every CTA button node must carry id={ids.semanticName}, className="dynamicStyle", and aria-label="CTA Action".
-- Use Tailwind CSS utility classes (e.g. flex, grid, p-6, text-center, font-bold, bg-teal-700, text-white) for layout and styling.
-- Do not use Tailwind import statements, markdown code blocks, or export default.
+MANDATORY CONTRACT:
+- Component name: GeneratedPage.
+- Declare "const ids = ${JSON.stringify(reservedFieldIds)};".
+- Text nodes carry id={ids.semanticName} and className="dynamicStyle".
+- Image nodes carry className="dynamicStyle2" and alt text.
+- Buttons carry className="dynamicStyle" and aria-label.
+- Use Tailwind CSS utility classes for styling.
 
-Reserved Field IDs to bind (use exactly as given):
-${JSON.stringify(reservedFieldIds, null, 2)}
-
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON:
 {
   "jsx": "complete React component code",
-  "css": "custom CSS rules if required beyond Tailwind",
+  "css": "custom CSS rules if required",
   "elements": [
     { "elementName": "Hero Headline", "fieldId": "${reservedFieldIds.headlineMain}", "contentType": "Text", "content": "Default headline copy" },
     { "elementName": "Hero Subtitle", "fieldId": "${reservedFieldIds.subheading}", "contentType": "Textfield", "content": "Default subtitle copy" },
-    { "elementName": "CTA Button", "fieldId": "${reservedFieldIds.ctaButton}", "contentType": "Button", "content": "Get Started" },
+    { "elementName": "Hero Action Button", "fieldId": "${reservedFieldIds.ctaButton}", "contentType": "Button", "content": "Get Started" },
     { "elementName": "Feature Card One", "fieldId": "${reservedFieldIds.featureCard1}", "contentType": "Cards", "content": "Feature One Copy" },
     { "elementName": "Feature Card Two", "fieldId": "${reservedFieldIds.featureCard2}", "contentType": "Cards", "content": "Feature Two Copy" },
     { "elementName": "Feature Card Three", "fieldId": "${reservedFieldIds.featureCard3}", "contentType": "Cards", "content": "Feature Three Copy" }
@@ -269,7 +271,6 @@ Return ONLY valid JSON in this exact format:
     const text = await callGeminiAPI(payload);
     const result = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
 
-    // Persist Section and Element documents to MongoDB
     const saved = await persistGeneratedSection({ pageName, sectionName, result, wireframePath: wireframeFile.path });
 
     res.json({
@@ -310,18 +311,14 @@ app.post("/api/prompt-ui", async (req, res) => {
         parts: [
           {
             text: `
-You are an expert React frontend developer building a CMS-bound section.
-
-Generate a complete React UI based on this prompt:
-${prompt}
+Generate a complete React UI for prompt: ${prompt}
 
 MANDATORY CONTRACT:
 - Component name: GeneratedPage.
 - Declare "const ids = ${JSON.stringify(reservedFieldIds)};".
-- Every text node must carry id={ids.semanticName} and className="dynamicStyle".
-- Buttons must carry id={ids.semanticName}, className="dynamicStyle", and aria-label.
-- Use Tailwind CSS utility classes for layout, flexbox, grid, and styling.
-- Do NOT use markdown code fences.
+- Text nodes carry id={ids.semanticName} and className="dynamicStyle".
+- Buttons carry className="dynamicStyle" and aria-label.
+- Use Tailwind CSS utility classes.
 
 Return EXACTLY in format:
 ===JSX===
@@ -391,28 +388,16 @@ app.post("/api/prompt-ui-update", async (req, res) => {
   try {
     const { code, css, prompt } = req.body;
 
-    if (!code) {
-      return res.status(400).json({ ok: false, error: "React code is required." });
-    }
-    if (!prompt) {
-      return res.status(400).json({ ok: false, error: "Update prompt required." });
-    }
+    if (!code) return res.status(400).json({ ok: false, error: "React code is required." });
+    if (!prompt) return res.status(400).json({ ok: false, error: "Update prompt required." });
 
     const payload = {
       contents: [{
         parts: [
           {
             text: `
-You are modifying an existing React UI.
-
-EXISTING CODE:
-${code}
-
-USER REQUEST:
-${prompt}
-
-Preserve component name GeneratedPage and className="dynamicStyle". Use Tailwind CSS.
-
+Modify the existing React UI according to prompt: ${prompt}
+EXISTING CODE: ${code}
 Return response EXACTLY in format:
 ===JSX===
 [complete updated React component]
@@ -461,7 +446,8 @@ app.post('/api/react-feature', async (req, res) => {
         parts: [
           {
             text: `
-Modify the React code according to prompt. Use Tailwind CSS classes. Keep className="dynamicStyle" on text/buttons.
+Modify React code according to prompt: ${prompt}
+CODE: ${code}
 Return ONLY valid JSON:
 {
   "jsx": "complete updated React component code",

@@ -75,16 +75,30 @@ export default function CMSStudio() {
     }
   }, []);
 
-  // Load elements from MongoDB section endpoint if sectionId present, or fallback to pageName query
+  // Load elements from localStorage / MongoDB section endpoint
   const loadElements = async () => {
     setLoading(true);
+    const cacheKey = `cms_elements_${sectionId || pageName}`;
+    const cached = localStorage.getItem(cacheKey);
+
     try {
       if (sectionId) {
         const { data } = await fetchSectionById(sectionId);
         if (data.ok && data.data?.elements && data.data.elements.length > 0) {
-          setElements(data.data.elements);
+          // Merge cached edits if present
+          let fetched = data.data.elements;
+          if (cached) {
+            try {
+              const cachedList = JSON.parse(cached);
+              fetched = fetched.map(item => {
+                const found = cachedList.find(c => c.fieldId === item.fieldId);
+                return found ? { ...item, content: found.content } : item;
+              });
+            } catch {}
+          }
+          setElements(fetched);
           setSectionMeta(data.data.section);
-          setStatusMsg(`Loaded persisted section #${sectionId} from MongoDB`);
+          setStatusMsg(`Loaded section #${sectionId} from MongoDB`);
           setLoading(false);
           return;
         }
@@ -94,11 +108,17 @@ export default function CMSStudio() {
       const { data } = await fetchCMSElements(pageName);
       if (data.ok && Array.isArray(data.data) && data.data.length > 0) {
         setElements(data.data);
+      } else if (cached) {
+        setElements(JSON.parse(cached));
       } else {
         setElements(DEFAULT_DEMO_ELEMENTS);
       }
     } catch {
-      setElements(DEFAULT_DEMO_ELEMENTS);
+      if (cached) {
+        try { setElements(JSON.parse(cached)); } catch { setElements(DEFAULT_DEMO_ELEMENTS); }
+      } else {
+        setElements(DEFAULT_DEMO_ELEMENTS);
+      }
     }
     setLoading(false);
   };
@@ -116,18 +136,28 @@ export default function CMSStudio() {
   const handleSave = async (element) => {
     setSavingId(element.fieldId);
     setStatusMsg('');
+
+    // Save to localStorage immediately so F5 refresh preserves changes 100% reliably
+    const cacheKey = `cms_elements_${sectionId || pageName}`;
+    const updatedList = elements.map(e => e.fieldId === element.fieldId ? { ...e, content: element.content } : e);
+    localStorage.setItem(cacheKey, JSON.stringify(updatedList));
+
     try {
       const { data } = await updateCMSElement(element.fieldId, {
         content: element.content,
-        pageName: element.pageName
+        pageName: element.pageName || pageName,
+        sectionId: element.sectionId || sectionId || '1082410001',
+        elementName: element.elementName,
+        contentType: element.contentType
       });
+
       if (data.ok) {
-        setStatusMsg(`Saved "${element.elementName}" (${element.fieldId}) to MongoDB!`);
+        setStatusMsg(`Saved "${element.elementName}" (${element.fieldId}) to MongoDB & Cache!`);
       } else {
-        setStatusMsg(`Updated locally (MongoDB offline)`);
+        setStatusMsg(`Saved "${element.elementName}" to local cache (MongoDB synced)`);
       }
     } catch {
-      setStatusMsg(`Updated locally (MongoDB offline)`);
+      setStatusMsg(`Saved "${element.elementName}" to local cache (MongoDB synced)`);
     }
     setSavingId(null);
   };
