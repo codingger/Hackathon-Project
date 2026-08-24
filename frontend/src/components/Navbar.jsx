@@ -13,6 +13,7 @@ export default function Navbar() {
         <NavLink to="/wireframe" className={tabClass}>Wireframe to React</NavLink>
         <NavLink to="/prompt-ui" className={tabClass}>Prompt UI</NavLink>
         <NavLink to="/code-modifier" className={tabClass}>Component Modifier</NavLink>
+        <NavLink to="/cms" className={tabClass}>CMS Studio</NavLink>
       </nav>
     </header>
   );

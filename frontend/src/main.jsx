@@ -6,6 +6,7 @@ import App from './App.jsx';
 import WireframeStudio from './pages/WireframeStudio.jsx';
 import PromptStudio from './pages/PromptStudio.jsx';
 import CodeModifier from './pages/CodeModifier.jsx';
+import CMSStudio from './pages/CMSStudio.jsx';
 
 const router = createBrowserRouter([
   {
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
       { path: '/wireframe', element: <WireframeStudio /> },
       { path: '/prompt-ui', element: <PromptStudio /> },
       { path: '/code-modifier', element: <CodeModifier /> },
+      { path: '/cms', element: <CMSStudio /> },
     ],
   },
 ]);

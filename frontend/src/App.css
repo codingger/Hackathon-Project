@@ -803,6 +803,78 @@ body {
   cursor: not-allowed;
 }
 
+/* ── CMS Studio Custom Styles ── */
+.cms-controls-bar {
+  display: flex;
+  gap: 1rem;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.cms-elements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cms-element-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.9rem;
+}
+
+.cms-element-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cms-element-name {
+  font: 700 0.85rem Georgia, serif;
+  color: var(--text-main);
+}
+
+.cms-type-badge {
+  font: 700 0.62rem system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.cms-field-meta {
+  font: 0.72rem system-ui, sans-serif;
+  color: var(--text-faint);
+}
+
+.cms-field-meta code {
+  background: var(--bg-tag);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.cms-empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  font: italic 0.9rem Georgia, serif;
+  color: var(--text-faint);
+  background: var(--bg-muted);
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 960px) {
   .workspace {
