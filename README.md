@@ -1,4 +1,4 @@
-# Studio AI — AI-Assisted UI Generation & CMS Platform (PS7)
+# ForgeKit AI — AI-Assisted UI Generation & CMS Platform (PS7)
 
 A full-stack AI-driven web development studio and CMS platform that converts wireframe sketches and textual prompts into contract-bound React components, with real-time MongoDB persistence and interactive hand editing.
 
