@@ -37,10 +37,19 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
 
   const handleTextChange = (item, newText) => {
     if (!jsx) return;
-    // Perform exact replace of old text inside the match
-    const oldText = item.text;
-    if (oldText === newText) return;
-    const updatedJsx = jsx.replace(oldText, newText);
+    const oldFullMatch = item.fullMatch;
+    if (!oldFullMatch) return;
+
+    // Safely replace text ONLY within the matched HTML tag structure
+    const newFullMatch = oldFullMatch.replace(item.text, newText);
+    if (oldFullMatch === newFullMatch) return;
+
+    const updatedJsx = jsx.replace(oldFullMatch, newFullMatch);
+    
+    // Update local item references for uninterrupted live typing
+    item.fullMatch = newFullMatch;
+    item.text = newText;
+
     onJsxChange(updatedJsx);
   };
 
