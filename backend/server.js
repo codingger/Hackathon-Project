@@ -42,7 +42,6 @@ async function callGeminiAPI(payload) {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file.");
   }
 
-  // Active Google AI Studio models for new API accounts
   const models = [
     'gemini-3.6-flash',
     'gemini-3.5-flash',
@@ -72,7 +71,7 @@ async function callGeminiAPI(payload) {
           continue;
         }
         console.warn(`[Gemini API] Model ${model} returned error status ${err.response?.status || 'network'}: ${err.message}. Trying next model...`);
-        break; // Move to next valid model
+        break;
       }
     }
   }
@@ -80,8 +79,239 @@ async function callGeminiAPI(payload) {
   return null;
 }
 
-// Helper to generate a contract-compliant fallback component if AI rate limit is exhausted
+// Multi-template Fallback Layout Generator matching all 4 Quick Starter options
 function createSmartFallbackLayout(prompt, reservedFieldIds) {
+  const p = (prompt || "").toLowerCase();
+
+  // 1. SAAS 3-TIER PRICING GRID
+  if (p.includes('pricing') || p.includes('saas') || p.includes('tier') || p.includes('grid') || p.includes('plan')) {
+    return {
+      jsx: `function GeneratedPage() {
+  const ids = ${JSON.stringify(reservedFieldIds)};
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans p-8 flex flex-col justify-center items-center">
+      <div className="text-center max-w-3xl mb-12">
+        <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-xs font-bold rounded-full uppercase tracking-wider">Flexible Plans</span>
+        <h1 id={ids.headlineMain} className="dynamicStyle text-4xl md:text-5xl font-black text-white mt-4 mb-4">
+          Simple, Transparent Pricing
+        </h1>
+        <p id={ids.subheading} className="dynamicStyle text-lg text-slate-400">
+          Choose the perfect plan for your business. Upgrade or cancel anytime.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl w-full">
+        {/* Starter Plan */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col justify-between hover:border-slate-700 transition">
+          <div>
+            <h3 id={ids.featureCard1 || ids.card1} className="dynamicStyle text-xl font-bold text-white mb-2">Starter</h3>
+            <div className="text-3xl font-extrabold text-indigo-400 mb-4">$19 <span className="text-sm font-normal text-slate-400">/mo</span></div>
+            <p className="text-slate-400 text-sm mb-6">Essential tools for individuals and small side projects.</p>
+          </div>
+          <button className="dynamicStyle w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition" aria-label="Get Starter">
+            Get Starter
+          </button>
+        </div>
+
+        {/* Pro Plan - Featured */}
+        <div className="bg-gradient-to-b from-indigo-950/80 to-slate-900 border-2 border-indigo-500 rounded-2xl p-8 flex flex-col justify-between shadow-2xl relative">
+          <span className="absolute -top-3 right-6 px-3 py-1 bg-indigo-600 text-white text-xs font-extrabold rounded-full uppercase">Most Popular</span>
+          <div>
+            <h3 id={ids.featureCard2 || ids.card2} className="dynamicStyle text-xl font-bold text-white mb-2">Professional</h3>
+            <div className="text-3xl font-extrabold text-indigo-300 mb-4">$49 <span className="text-sm font-normal text-slate-400">/mo</span></div>
+            <p className="text-slate-400 text-sm mb-6">Advanced analytics, AI features, and priority support for teams.</p>
+          </div>
+          <button id={ids.ctaButton} className="dynamicStyle w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition" aria-label="Start Pro Trial">
+            Start Pro Trial
+          </button>
+        </div>
+
+        {/* Enterprise Plan */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col justify-between hover:border-slate-700 transition">
+          <div>
+            <h3 id={ids.featureCard3 || ids.card3} className="dynamicStyle text-xl font-bold text-white mb-2">Enterprise</h3>
+            <div className="text-3xl font-extrabold text-emerald-400 mb-4">Custom</div>
+            <p className="text-slate-400 text-sm mb-6">Dedicated infrastructure, custom SLAs, and 24/7 account management.</p>
+          </div>
+          <button className="dynamicStyle w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition" aria-label="Contact Sales">
+            Contact Sales
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}`,
+      css: ".dynamicStyle { transition: all 0.2s ease-in-out; }",
+      elements: [
+        { elementName: "Main Headline", fieldId: reservedFieldIds.headlineMain, contentType: "Text", content: "Simple, Transparent Pricing" },
+        { elementName: "Subheading", fieldId: reservedFieldIds.subheading, contentType: "Textfield", content: "Choose the perfect plan for your business." },
+        { elementName: "Starter Card", fieldId: reservedFieldIds.featureCard1 || reservedFieldIds.card1, contentType: "Cards", content: "Starter — $19/mo" },
+        { elementName: "Pro Card", fieldId: reservedFieldIds.featureCard2 || reservedFieldIds.card2, contentType: "Cards", content: "Professional — $49/mo" },
+        { elementName: "Enterprise Card", fieldId: reservedFieldIds.featureCard3 || reservedFieldIds.card3, contentType: "Cards", content: "Enterprise — Custom" },
+        { elementName: "CTA Button", fieldId: reservedFieldIds.ctaButton, contentType: "Button", content: "Start Pro Trial" }
+      ]
+    };
+  }
+
+  // 2. E-COMMERCE HERO WITH CARDS
+  if (p.includes('e-commerce') || p.includes('store') || p.includes('shop') || p.includes('product') || p.includes('cards')) {
+    return {
+      jsx: `function GeneratedPage() {
+  const ids = ${JSON.stringify(reservedFieldIds)};
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans p-8 flex flex-col justify-between">
+      <header className="max-w-6xl mx-auto w-full flex justify-between items-center py-4 border-b border-slate-800 mb-8">
+        <div className="text-xl font-black text-amber-400">LuxeShop</div>
+        <button id={ids.ctaButton} className="dynamicStyle bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-xl transition" aria-label="View Cart">
+          View Cart (3)
+        </button>
+      </header>
+
+      <main className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="lg:col-span-5">
+          <span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold rounded-full uppercase">New Season Arrivals</span>
+          <h1 id={ids.headlineMain} className="dynamicStyle text-4xl md:text-5xl font-extrabold text-white mt-4 mb-4">
+            Curated Luxury Lifestyle Essentials
+          </h1>
+          <p id={ids.subheading} className="dynamicStyle text-slate-400 text-base mb-6">
+            Handpicked premium footwear, minimalist tech gear, and timeless accessories crafted for modern living.
+          </p>
+          <button className="dynamicStyle bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-amber-500/20" aria-label="Explore Collection">
+            Explore Collection →
+          </button>
+        </div>
+
+        <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+            <div className="text-4xl mb-3">👟</div>
+            <h3 id={ids.featureCard1 || ids.card1} className="dynamicStyle text-lg font-bold text-white mb-1">UltraBoost Runner</h3>
+            <div className="text-amber-400 font-extrabold text-xl mb-2">$180</div>
+            <p className="text-slate-400 text-xs">Lightweight breathable knit mesh with responsive cushioning.</p>
+          </div>
+          <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+            <div className="text-4xl mb-3">⌚</div>
+            <h3 id={ids.featureCard2 || ids.card2} className="dynamicStyle text-lg font-bold text-white mb-1">Chrono-X Smart Watch</h3>
+            <div className="text-amber-400 font-extrabold text-xl mb-2">$320</div>
+            <p className="text-slate-400 text-xs">Titanium bezel with AMOLED display and 7-day battery life.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}`,
+      css: ".dynamicStyle { transition: all 0.2s ease-in-out; }",
+      elements: [
+        { elementName: "Store Title", fieldId: reservedFieldIds.headlineMain, contentType: "Text", content: "Curated Luxury Lifestyle Essentials" },
+        { elementName: "Store Description", fieldId: reservedFieldIds.subheading, contentType: "Textfield", content: "Handpicked premium footwear, minimalist tech gear, and accessories." },
+        { elementName: "Product One", fieldId: reservedFieldIds.featureCard1 || reservedFieldIds.card1, contentType: "Cards", content: "UltraBoost Runner — $180" },
+        { elementName: "Product Two", fieldId: reservedFieldIds.featureCard2 || reservedFieldIds.card2, contentType: "Cards", content: "Chrono-X Smart Watch — $320" },
+        { elementName: "Cart Button", fieldId: reservedFieldIds.ctaButton, contentType: "Button", content: "View Cart (3)" }
+      ]
+    };
+  }
+
+  // 3. MINIMALIST AGENCY PORTFOLIO
+  if (p.includes('agency') || p.includes('portfolio') || p.includes('minimalist') || p.includes('studio') || p.includes('design')) {
+    return {
+      jsx: `function GeneratedPage() {
+  const ids = ${JSON.stringify(reservedFieldIds)};
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans p-8 flex flex-col justify-between">
+      <header className="max-w-5xl mx-auto w-full flex justify-between items-center py-4 border-b border-zinc-800">
+        <div className="text-lg font-extrabold tracking-wider text-white">STUDIO MONO</div>
+        <button id={ids.ctaButton} className="dynamicStyle bg-zinc-100 hover:bg-white text-zinc-950 font-bold px-4 py-2 rounded-lg text-sm transition" aria-label="Start Project">
+          Start Project
+        </button>
+      </header>
+
+      <main className="max-w-5xl mx-auto w-full my-auto py-12">
+        <span className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-4 block">// Independent Creative Agency</span>
+        <h1 id={ids.headlineMain} className="dynamicStyle text-4xl md:text-6xl font-black text-white tracking-tight mb-6 leading-tight">
+          We Craft Digital Experiences That Define Brands.
+        </h1>
+        <p id={ids.subheading} className="dynamicStyle text-lg text-zinc-400 max-w-2xl mb-10 leading-relaxed">
+          Specializing in brand identity, custom web engineering, and interactive motion design for ambitious global startups.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 id={ids.featureCard1 || ids.card1} className="dynamicStyle text-xl font-bold text-white mb-2">Fintech Neobank App</h3>
+            <p className="text-zinc-400 text-sm">Full UI/UX redesign and mobile design system for 2M+ active users.</p>
+          </div>
+          <div className="p-6 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 id={ids.featureCard2 || ids.card2} className="dynamicStyle text-xl font-bold text-white mb-2">AI Motion Dashboard</h3>
+            <p className="text-zinc-400 text-sm">Interactive 3D web canvas built with WebGL and Tailwind CSS.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}`,
+      css: ".dynamicStyle { transition: all 0.2s ease-in-out; }",
+      elements: [
+        { elementName: "Agency Headline", fieldId: reservedFieldIds.headlineMain, contentType: "Text", content: "We Craft Digital Experiences That Define Brands." },
+        { elementName: "Agency Subtitle", fieldId: reservedFieldIds.subheading, contentType: "Textfield", content: "Specializing in brand identity, custom web engineering, and motion design." },
+        { elementName: "Case Study One", fieldId: reservedFieldIds.featureCard1 || reservedFieldIds.card1, contentType: "Cards", content: "Fintech Neobank App" },
+        { elementName: "Case Study Two", fieldId: reservedFieldIds.featureCard2 || reservedFieldIds.card2, contentType: "Cards", content: "AI Motion Dashboard" },
+        { elementName: "Project CTA", fieldId: reservedFieldIds.ctaButton, contentType: "Button", content: "Start Project" }
+      ]
+    };
+  }
+
+  // 4. FITNESS WORKOUT LANDING PAGE
+  if (p.includes('fitness') || p.includes('workout') || p.includes('gym') || p.includes('training') || p.includes('health')) {
+    return {
+      jsx: `function GeneratedPage() {
+  const ids = ${JSON.stringify(reservedFieldIds)};
+  return (
+    <div className="min-h-screen bg-neutral-950 text-white font-sans p-8 flex flex-col justify-between">
+      <header className="max-w-6xl mx-auto w-full flex justify-between items-center py-4 border-b border-neutral-800">
+        <div className="text-2xl font-black text-rose-500 tracking-tighter">PULSE FIT</div>
+        <button id={ids.ctaButton} className="dynamicStyle bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-5 py-2.5 rounded-xl transition shadow-lg shadow-rose-600/30" aria-label="Join Today">
+          Join Today
+        </button>
+      </header>
+
+      <main className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
+        <div className="lg:col-span-7">
+          <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-black rounded-full uppercase tracking-wider">Unleash Your Potential</span>
+          <h1 id={ids.headlineMain} className="dynamicStyle text-4xl md:text-6xl font-black text-white mt-4 mb-4 tracking-tight">
+            Transform Your Body With AI Personal Coaching
+          </h1>
+          <p id={ids.subheading} className="dynamicStyle text-lg text-neutral-400 mb-8">
+            Tailored HIIT workouts, real-time posture tracking, and personalized nutrition plans tailored to your goals.
+          </p>
+          <button className="dynamicStyle bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-xl shadow-rose-600/30 transition" aria-label="Start Free Trial">
+            Start 14-Day Free Trial
+          </button>
+        </div>
+
+        <div className="lg:col-span-5 grid grid-cols-1 gap-4">
+          <div className="p-6 bg-neutral-900 border border-neutral-800 rounded-2xl">
+            <h3 id={ids.featureCard1 || ids.card1} className="dynamicStyle text-xl font-bold text-rose-400 mb-1">500+ Guided Workouts</h3>
+            <p className="text-neutral-400 text-xs">Strength, cardio, mobility, and recovery sessions updated weekly.</p>
+          </div>
+          <div className="p-6 bg-neutral-900 border border-neutral-800 rounded-2xl">
+            <h3 id={ids.featureCard2 || ids.card2} className="dynamicStyle text-xl font-bold text-rose-400 mb-1">Live Calorie Analytics</h3>
+            <p className="text-neutral-400 text-xs">Connect your smartwatch for real-time heart rate and calorie metrics.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}`,
+      css: ".dynamicStyle { transition: all 0.2s ease-in-out; }",
+      elements: [
+        { elementName: "Fitness Headline", fieldId: reservedFieldIds.headlineMain, contentType: "Text", content: "Transform Your Body With AI Personal Coaching" },
+        { elementName: "Fitness Subtitle", fieldId: reservedFieldIds.subheading, contentType: "Textfield", content: "Tailored HIIT workouts, posture tracking, and nutrition plans." },
+        { elementName: "Feature One", fieldId: reservedFieldIds.featureCard1 || reservedFieldIds.card1, contentType: "Cards", content: "500+ Guided Workouts" },
+        { elementName: "Feature Two", fieldId: reservedFieldIds.featureCard2 || reservedFieldIds.card2, contentType: "Cards", content: "Live Calorie Analytics" },
+        { elementName: "Join CTA", fieldId: reservedFieldIds.ctaButton, contentType: "Button", content: "Join Today" }
+      ]
+    };
+  }
+
+  // 5. DEFAULT COFFEE SHOP HERO
   const headline = prompt ? `Custom ${prompt.substring(0, 30)} Layout` : "Artisanal Coffee & Roastery";
   return {
     jsx: `function GeneratedPage() {
