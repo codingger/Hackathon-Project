@@ -11,6 +11,44 @@ const PRESETS = [
   'Fitness Workout Landing Page'
 ];
 
+const DEMO_WIREFRAME_JSX = `function GeneratedPage() {
+  return (
+    <div style={{ padding: "40px", maxWidth: "960px", margin: "0 auto", fontFamily: "Georgia, serif", color: "#161c1b" }}>
+      <header style={{ textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.1em", color: "#2a6f6f", marginBottom: "8px", fontWeight: "bold" }}>
+        PRECISION COFFEE GRINDER — DEMO PRESET
+      </header>
+      <h1 style={{ fontSize: "2.4rem", margin: "0 0 12px 0", letterSpacing: "-0.02em" }}>
+        Crafted for Coffee Connoisseurs
+      </h1>
+      <p style={{ fontSize: "1.1rem", color: "#5c5952", maxWidth: "600px", lineHeight: "1.6", marginBottom: "24px" }}>
+        Experience uniform extraction with stepless ceramic burrs and ultra-quiet motor engineering.
+      </p>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "40px" }}>
+        <button style={{ padding: "12px 24px", background: "#2a6f6f", color: "#ffffff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
+          Order Now — $249
+        </button>
+        <button style={{ padding: "12px 24px", background: "transparent", color: "#161c1b", border: "1px solid #d6d0c4", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
+          Explore Specifications
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
+          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Ceramic Burrs</h3>
+          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Zero heat transfer during grinding.</p>
+        </div>
+        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
+          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Stepless Dial</h3>
+          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Micron-level espresso precision.</p>
+        </div>
+        <div style={{ padding: "20px", background: "#fffdf8", border: "1px solid #d6d0c4", borderRadius: "8px" }}>
+          <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem" }}>Whisper Quiet</h3>
+          <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5952" }}>Low-RPM high-torque motor.</p>
+        </div>
+      </div>
+    </div>
+  );
+}`;
+
 export default function WireframeStudio() {
   const [file, setFile] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -38,12 +76,18 @@ export default function WireframeStudio() {
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
-      // Auto-switch to Hand Editor tab upon generation!
       setTab('editor');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
     setLoading(false);
+  };
+
+  const loadInstantDemo = () => {
+    setJsx(DEMO_WIREFRAME_JSX);
+    setCss('');
+    setError('');
+    setTab('editor');
   };
 
   const refine = async (e) => {
@@ -164,12 +208,25 @@ export default function WireframeStudio() {
                 )}
               </div>
 
-              {error && <div className="error-msg">{error}</div>}
+              {/* Instant Demo Bypass Button when Gemini Rate Limit (429) occurs */}
+              {error && (
+                <div className="error-msg">
+                  <div>{error}</div>
+                  <button 
+                    type="button" 
+                    className="action-btn" 
+                    onClick={loadInstantDemo}
+                    style={{ marginTop: '0.6rem', background: '#2a6f6f', color: '#fff', width: '100%' }}
+                  >
+                    ⚡ Load Demo Layout (Bypass API Wait)
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         </section>
 
-        {/* Right Panel: Live Stage with Integrated Hand Editor */}
+        {/* Right Panel: Live Stage */}
         <section className="live-stage">
           <header className="stage-header">
             <div className="stage-tabs">
