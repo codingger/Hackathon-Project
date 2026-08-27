@@ -1,12 +1,12 @@
-﻿{
+{
   "name": "forgekit",
   "version": "1.0.0",
   "private": true,
   "description": "ForgeKit - AI UI Studio & Dynamic CMS Engine",
   "main": "backend/server.js",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "vercel-build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install && npm run build && cp -r dist ../public",
+    "vercel-build": "cd frontend && npm install && npm run build && cp -r dist ../public",
     "start": "node backend/server.js"
   },
   "dependencies": {
@@ -19,7 +19,13 @@
     "mongoose": "^9.9.3",
     "multer": "^2.2.0"
   },
-  "keywords": ["ai", "ui-generator", "react", "tailwind", "cms"],
+  "keywords": [
+    "ai",
+    "ui-generator",
+    "react",
+    "tailwind",
+    "cms"
+  ],
   "author": "ForgeKit Team",
   "license": "MIT"
 }
