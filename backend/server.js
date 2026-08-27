@@ -747,8 +747,17 @@ app.post('/api/evaluate-ui', (req, res) => {
 
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// Serve static frontend assets in production
+const frontendDist = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
