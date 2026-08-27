@@ -747,7 +747,10 @@ app.post('/api/evaluate-ui', (req, res) => {
 
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
-// Serve static frontend assets in production
+  }
+});
+
+// Serve static frontend assets in production (Docker / Node environments)
 const frontendDist = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
@@ -759,6 +762,10 @@ if (fs.existsSync(frontendDist)) {
   });
 }
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+module.exports = app;
