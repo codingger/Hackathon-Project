@@ -8,6 +8,8 @@ const sectionSchema = new mongoose.Schema({
   isGenerated: { type: Boolean, default: true },
   variations: { type: String, default: "1" },
   cardGridColumns: { type: Number, default: 3 },
+  jsx: { type: String, default: "" },
+  css: { type: String, default: "" }
 }, { timestamps: true });
 
 export default mongoose.model('Section', sectionSchema);

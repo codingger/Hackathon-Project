@@ -3,57 +3,6 @@ import { fetchCMSElements, fetchSectionById, updateCMSElement } from '../service
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
 
-const DEFAULT_DEMO_ELEMENTS = [
-  {
-    fieldId: '2082410981',
-    elementName: 'Hero Main Headline',
-    contentType: 'Text',
-    content: 'Build & Evolve React Apps at AI Speed',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  },
-  {
-    fieldId: '2082410982',
-    elementName: 'Hero Subtitle',
-    contentType: 'Textfield',
-    content: 'Transform sketches and prompts into production-ready React components with real-time CMS content management.',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  },
-  {
-    fieldId: '2082410983',
-    elementName: 'Hero Action Button',
-    contentType: 'Button',
-    content: 'Explore Studio Modes',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  },
-  {
-    fieldId: '2082410984',
-    elementName: 'Feature Card One',
-    contentType: 'Cards',
-    content: 'Wireframe to Code',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  },
-  {
-    fieldId: '2082410985',
-    elementName: 'Feature Card Two',
-    contentType: 'Cards',
-    content: 'Iterative AI Prompts',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  },
-  {
-    fieldId: '2082410986',
-    elementName: 'Feature Card Three',
-    contentType: 'Cards',
-    content: 'Realtime MongoDB Sync',
-    pageName: 'Home',
-    sectionId: '1082410001'
-  }
-];
-
 export default function CMSStudio() {
   const [pageName, setPageName] = useState('Home');
   const [sectionId, setSectionId] = useState('');
@@ -66,39 +15,38 @@ export default function CMSStudio() {
   const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
 
-  // Read sectionId query param from URL on mount
+  // Read sectionId query param or localStorage cache on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('sectionId');
     if (sid) {
       setSectionId(sid);
+    } else {
+      try {
+        const cached = localStorage.getItem('forgekit_latest_session');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.sectionId) setSectionId(parsed.sectionId);
+          if (parsed.pageName) setPageName(parsed.pageName);
+          if (parsed.jsx) setSectionMeta({ sectionId: parsed.sectionId, pageName: parsed.pageName || 'Home', jsx: parsed.jsx, css: parsed.css || '' });
+          if (Array.isArray(parsed.elements) && parsed.elements.length > 0) setElements(parsed.elements);
+        }
+      } catch {}
     }
   }, []);
 
-  // Load elements from localStorage / MongoDB section endpoint
+  // Load elements from MongoDB or offline memory store
   const loadElements = async () => {
     setLoading(true);
-    const cacheKey = `cms_elements_${sectionId || pageName}`;
-    const cached = localStorage.getItem(cacheKey);
+    setStatusMsg('');
 
     try {
       if (sectionId) {
         const { data } = await fetchSectionById(sectionId);
-        if (data.ok && data.data?.elements && data.data.elements.length > 0) {
-          // Merge cached edits if present
-          let fetched = data.data.elements;
-          if (cached) {
-            try {
-              const cachedList = JSON.parse(cached);
-              fetched = fetched.map(item => {
-                const found = cachedList.find(c => c.fieldId === item.fieldId);
-                return found ? { ...item, content: found.content } : item;
-              });
-            } catch {}
-          }
-          setElements(fetched);
-          setSectionMeta(data.data.section);
-          setStatusMsg(`Loaded section #${sectionId} from MongoDB`);
+        if (data.ok && data.data && (data.data.section || data.data.elements?.length > 0)) {
+          setElements(data.data.elements || []);
+          setSectionMeta(data.data.section || null);
+          setStatusMsg(`Loaded section #${sectionId}`);
           setLoading(false);
           return;
         }
@@ -108,17 +56,28 @@ export default function CMSStudio() {
       const { data } = await fetchCMSElements(pageName);
       if (data.ok && Array.isArray(data.data) && data.data.length > 0) {
         setElements(data.data);
-      } else if (cached) {
-        setElements(JSON.parse(cached));
       } else {
-        setElements(DEFAULT_DEMO_ELEMENTS);
+        // Fallback to local session if available
+        const cached = localStorage.getItem('forgekit_latest_session');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.jsx) setSectionMeta({ sectionId: parsed.sectionId, pageName: parsed.pageName || 'Home', jsx: parsed.jsx, css: parsed.css || '' });
+          if (Array.isArray(parsed.elements) && parsed.elements.length > 0) setElements(parsed.elements);
+        } else {
+          setElements([]);
+        }
       }
-    } catch {
-      if (cached) {
-        try { setElements(JSON.parse(cached)); } catch { setElements(DEFAULT_DEMO_ELEMENTS); }
-      } else {
-        setElements(DEFAULT_DEMO_ELEMENTS);
-      }
+    } catch (err) {
+      // Offline fallback to local session
+      try {
+        const cached = localStorage.getItem('forgekit_latest_session');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.jsx) setSectionMeta({ sectionId: parsed.sectionId, pageName: parsed.pageName || 'Home', jsx: parsed.jsx, css: parsed.css || '' });
+          if (Array.isArray(parsed.elements) && parsed.elements.length > 0) setElements(parsed.elements);
+        }
+      } catch {}
+      setStatusMsg('Loaded from local session cache.');
     }
     setLoading(false);
   };
@@ -162,12 +121,6 @@ export default function CMSStudio() {
     setSavingId(null);
   };
 
-  const seedDemoData = () => {
-    setSectionId('');
-    setElements(DEFAULT_DEMO_ELEMENTS);
-    setStatusMsg('Demo CMS elements loaded into studio!');
-  };
-
   const filteredElements = useMemo(() => {
     if (!search.trim()) return elements;
     const s = search.toLowerCase();
@@ -181,6 +134,19 @@ export default function CMSStudio() {
 
   // Construct dynamic React JSX & CSS from current CMS elements state for live preview
   const generatedJSX = useMemo(() => {
+    // If we have the real AI-generated JSX stored in MongoDB Section, use it!
+    if (sectionMeta?.jsx) {
+      let liveJsx = sectionMeta.jsx;
+      elements.forEach(el => {
+        if (el.fieldId && el.content) {
+          // Replace matching text inside the component if updated
+          const idRegex = new RegExp(`(<[^>]+(?:id=\\{ids\\.[^}]+\\}|id="${el.fieldId}")[^>]*>)([^<]*)(<\\/)`, 'gi');
+          liveJsx = liveJsx.replace(idRegex, `$1${el.content}$3`);
+        }
+      });
+      return liveJsx;
+    }
+
     if (!elements || elements.length === 0) return '';
 
     const textElements = elements.filter(e => e.contentType === 'Text' || e.contentType === 'Textfield');
@@ -249,7 +215,7 @@ ${cardItemsJSX}
               <h2>Live CMS<br /><em>content editor.</em></h2>
               {sectionId && (
                 <span className="dropzone-sublabel" style={{ color: '#2a6f6f', fontWeight: 'bold' }}>
-                  📌 Active Section ID: #{sectionId}
+                  Active Section ID: #{sectionId}
                 </span>
               )}
             </div>
@@ -287,10 +253,10 @@ ${cardItemsJSX}
                 <div className="cms-empty-state">Loading CMS elements from MongoDB...</div>
               ) : filteredElements.length === 0 ? (
                 <div className="cms-empty-state">
-                  <p>No elements found.</p>
-                  <button type="button" className="preset-chip" onClick={seedDemoData} style={{ marginTop: '0.8rem' }}>
-                    + Load Demo Page Elements
-                  </button>
+                  <p>No CMS elements found for this section/page.</p>
+                  <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.4rem' }}>
+                    Generate a UI component in Wireframe or Prompt Studio to manage its fields here.
+                  </p>
                 </div>
               ) : (
                 filteredElements.map((el) => (
@@ -363,8 +329,17 @@ ${cardItemsJSX}
               </button>
             </div>
 
-            {tab === 'preview' && (
-              <div className="stage-actions">
+            <div className="stage-actions">
+              <button 
+                type="button"
+                onClick={() => { setElements([]); setSectionMeta(null); setSectionId(''); setStatusMsg('Canvas reset.'); try { localStorage.removeItem('forgekit_latest_session'); } catch {} }}
+                className="preset-chip"
+                style={{ background: '#991b1b', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                title="Clear CMS elements and canvas"
+              >
+                Reset Canvas
+              </button>
+              {tab === 'preview' && (
                 <div className="viewport-toggles">
                   <button 
                     className={`viewport-btn ${viewport === 'desktop' ? 'active' : ''}`} 
@@ -381,8 +356,8 @@ ${cardItemsJSX}
                     Mobile
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </header>
 
           <div className="stage-body">

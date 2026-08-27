@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { generateFromPrompt, updatePromptUI } from '../services/api';
+import { useState, useEffect } from 'react';
+import { generateFromPrompt, updatePromptUI, evaluateUI } from '../services/api';
 import PreviewSandbox from '../components/PreviewSandbox';
 import CodeViewer from '../components/CodeViewer';
 import VisualElementEditor from '../components/VisualElementEditor';
+import MLAuditModal from '../components/MLAuditModal';
 
 const INSPIRATIONS = [
   'SaaS Landing Page with Pricing',
@@ -11,61 +12,57 @@ const INSPIRATIONS = [
   'Creative Agency Portfolio Hero'
 ];
 
-const DEMO_PROMPT_JSX = `function GeneratedPage() {
-  const ids = {
-    headlineMain: "2082410981",
-    subheading: "2082410982",
-    ctaButton: "2082410983"
-  };
-
-  return (
-    <div className="p-8 max-w-4xl mx-auto font-sans text-gray-900">
-      <header className="text-center p-8 bg-amber-50/50 border border-amber-200/60 rounded-xl shadow-sm mb-8">
-        <span className="text-xs font-bold tracking-widest text-teal-800 bg-teal-100/70 px-3 py-1 rounded-full uppercase">
-          CREATIVE AGENCY PORTFOLIO — DEMO PRESET
-        </span>
-        <h1 id={ids.headlineMain} className="dynamicStyle text-3xl font-serif font-extrabold mt-4 mb-2 text-gray-900">
-          We Design Digital Experiences That Scale
-        </h1>
-        <p id={ids.subheading} className="dynamicStyle text-base text-gray-600 max-w-xl mx-auto mb-6 leading-relaxed">
-          Transforming complex brand challenges into intuitive, high-converting digital products.
-        </p>
-        <button id={ids.ctaButton} className="dynamicStyle px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm uppercase tracking-wider rounded-lg shadow-md transition" aria-label="Start a Project CTA">
-          Start a Project
-        </button>
-      </header>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-1">UI/UX Architecture</h3>
-          <p className="text-xs text-gray-600">Research-backed design systems.</p>
-        </div>
-        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-1">React Engineering</h3>
-          <p className="text-xs text-gray-600">Blazing fast component architecture.</p>
-        </div>
-        <div className="dynamicStyle p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-1">Brand Strategy</h3>
-          <p className="text-xs text-gray-600">Positioning for market leadership.</p>
-        </div>
-      </div>
-    </div>
-  );
-}`;
+const BRAND_KITS = [
+  { id: 'modern', label: 'Modern Clean' },
+  { id: 'fintech', label: 'Fintech SaaS' },
+  { id: 'eco', label: 'Eco Organic' },
+  { id: 'cyber', label: 'Midnight Cyber' },
+  { id: 'brutalist', label: 'Neo-Brutalism' }
+];
 
 export default function PromptStudio() {
   const [prompt, setPrompt] = useState('');
+  const [brandKit, setBrandKit] = useState('modern');
   const [refinePrompt, setRefinePrompt] = useState('');
   const [jsx, setJsx] = useState('');
   const [css, setCss] = useState('');
   const [sectionId, setSectionId] = useState('');
+  const [evalData, setEvalData] = useState(null);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [isAuditFixing, setIsAuditFixing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('preview');
   const [viewport, setViewport] = useState('desktop');
 
+  // Restore recent session on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('forgekit_latest_session');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.jsx) {
+          setJsx(parsed.jsx);
+          setCss(parsed.css || '');
+          setSectionId(parsed.sectionId || '');
+          triggerEvaluation(parsed.jsx, parsed.css || '');
+        }
+      }
+    } catch {}
+  }, []);
+
   const isMeaningfulPrompt = prompt.trim().length >= 8 && prompt.trim().split(/\s+/).filter(Boolean).length >= 2;
   const canGenerate = !loading && isMeaningfulPrompt;
+
+  const triggerEvaluation = async (componentJsx, componentCss) => {
+    try {
+      const { data } = await evaluateUI(componentJsx, componentCss);
+      if (data.ok) {
+        setEvalData(data.evaluation);
+      }
+    } catch {}
+  };
 
   const generate = async (e) => {
     e.preventDefault();
@@ -75,25 +72,28 @@ export default function PromptStudio() {
     }
     setLoading(true);
     setError('');
+    setEvalData(null);
     try {
-      const { data } = await generateFromPrompt(prompt);
+      const { data } = await generateFromPrompt(prompt, brandKit);
       if (!data.ok) throw new Error(data.error);
       setJsx(data.jsx);
       setCss(data.css || '');
       setSectionId(data.sectionId || '');
-      setTab('editor');
+      setTab('preview');
+      try {
+        localStorage.setItem('forgekit_latest_session', JSON.stringify({
+          sectionId: data.sectionId,
+          pageName: 'Home',
+          jsx: data.jsx,
+          css: data.css || '',
+          elements: data.elementIds?.map(id => ({ fieldId: id, elementName: 'Field #' + id, content: '', contentType: 'Text' })) || []
+        }));
+      } catch {}
+      triggerEvaluation(data.jsx, data.css || '');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
     setLoading(false);
-  };
-
-  const loadInstantDemo = () => {
-    setJsx(DEMO_PROMPT_JSX);
-    setCss('');
-    setSectionId('1082410001');
-    setError('');
-    setTab('editor');
   };
 
   const refine = async (e) => {
@@ -108,10 +108,73 @@ export default function PromptStudio() {
       setCss(data.css || '');
       setRefinePrompt('');
       setTab('editor');
+      triggerEvaluation(data.jsx, data.css || '');
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
     setRefining(false);
+  };
+
+  const handleAutoFix = async () => {
+    setIsAuditFixing(true);
+    try {
+      const fixPrompt = "Auto-fix all WCAG 2.1 AA accessibility guidelines: ensure high-contrast colors, 48px interactive touch targets, semantic hierarchy, and fluid responsive mobile-first Tailwind grid.";
+      const { data } = await updatePromptUI(jsx, css, fixPrompt);
+      if (data.ok) {
+        setJsx(data.jsx);
+        setCss(data.css || '');
+        triggerEvaluation(data.jsx, data.css || '');
+      }
+    } catch {}
+    setIsAuditFixing(false);
+  };
+
+  const handleReset = () => {
+    setJsx('');
+    setCss('');
+    setEvalData(null);
+    setSectionId('');
+    setTab('preview');
+    try {
+      localStorage.removeItem('forgekit_latest_session');
+    } catch {}
+  };
+
+  const downloadJSX = () => {
+    const blob = new Blob([jsx], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GeneratedComponent_${sectionId || 'forgekit'}.jsx`;
+    a.click();
+  };
+
+  const downloadHTML = () => {
+    const htmlCode = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>${css}</style>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+${jsx}
+ReactDOM.createRoot(document.getElementById("root")).render(<GeneratedPage />);
+  </script>
+</body>
+</html>`;
+    const blob = new Blob([htmlCode], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ForgeKit_Standalone_${sectionId || 'page'}.html`;
+    a.click();
   };
 
   return (
@@ -133,9 +196,36 @@ export default function PromptStudio() {
                   className="field-textarea"
                   value={prompt} 
                   onChange={(e) => setPrompt(e.target.value)} 
-                  rows="5" 
+                  rows="4" 
                   placeholder="Example: Create a modern landing page for a developer tool with a hero banner, feature cards, and a get started button..." 
                 />
+              </div>
+
+              {/* Brand Kit Design Tokens */}
+              <div className="field-group">
+                <label className="field-label">Adaptive Brand Kit Tokens</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                  {BRAND_KITS.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setBrandKit(b.id)}
+                      className={`preset-chip ${brandKit === b.id ? 'active' : ''}`}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: brandKit === b.id ? '#0f766e' : '#f5f5f4',
+                        color: brandKit === b.id ? '#fff' : '#44403c',
+                        border: '1px solid ' + (brandKit === b.id ? '#0f766e' : '#e7e5e4'),
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="field-group">
@@ -145,7 +235,7 @@ export default function PromptStudio() {
                     <button 
                       key={idx} 
                       type="button" 
-                      className="preset-chip" 
+                      className={`preset-chip ${prompt === item ? 'active' : ''}`}
                       onClick={() => setPrompt(item)}
                     >
                       {item}
@@ -164,21 +254,13 @@ export default function PromptStudio() {
                 ) : !isMeaningfulPrompt ? (
                   'Add a few words describing what you want to build'
                 ) : (
-                  <span>✓ Blueprint ready for AI generation</span>
+                  <span>Blueprint ready for AI generation</span>
                 )}
               </div>
 
               {error && (
                 <div className="error-msg">
                   <div>{error}</div>
-                  <button 
-                    type="button" 
-                    className="action-btn" 
-                    onClick={loadInstantDemo}
-                    style={{ marginTop: '0.6rem', background: '#2a6f6f', color: '#fff', width: '100%' }}
-                  >
-                    ⚡ Load Demo Layout (Bypass API Wait)
-                  </button>
                 </div>
               )}
             </form>
@@ -199,7 +281,7 @@ export default function PromptStudio() {
                 className={`stage-tab ${tab === 'editor' ? 'active' : ''}`} 
                 onClick={() => setTab('editor')}
               >
-                ✏️ Visual Hand Editor
+                Visual Hand Editor
               </button>
               <button 
                 className={`stage-tab ${tab === 'jsx' ? 'active' : ''}`} 
@@ -216,15 +298,58 @@ export default function PromptStudio() {
             </div>
 
             <div className="stage-actions">
+              {evalData && (
+                <button 
+                  type="button"
+                  onClick={() => setIsAuditOpen(true)}
+                  className="preset-chip" 
+                  style={{ background: '#0f766e', color: '#fff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+                  title="Click to view full ML Quality & WCAG Audit Breakdown"
+                >
+                  <span>Score: {evalData.overallScore}/100</span>
+                </button>
+              )}
+              {jsx && (
+                <div style={{ display: 'flex', gap: '3px' }}>
+                  <button 
+                    type="button"
+                    onClick={downloadJSX}
+                    className="preset-chip"
+                    style={{ background: '#1e293b', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                    title="Download React JSX Component file"
+                  >
+                    .JSX
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={downloadHTML}
+                    className="preset-chip"
+                    style={{ background: '#334155', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                    title="Download Standalone HTML Bundle"
+                  >
+                    .HTML
+                  </button>
+                </div>
+              )}
               {sectionId && (
                 <a 
                   href={`/cms?sectionId=${sectionId}`}
                   className="preset-chip" 
                   style={{ background: '#2a6f6f', color: '#fff', textDecoration: 'none', border: 'none' }}
+                  title="Open this generated section in CMS Studio"
                 >
-                  ⚙️ Open in CMS Studio (#{sectionId})
+                  CMS Studio
                 </a>
               )}
+              <button 
+                type="button"
+                onClick={handleReset}
+                className="preset-chip"
+                style={{ background: '#991b1b', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                title="Clear canvas and start a fresh idea"
+              >
+                Reset Canvas
+              </button>
               <div className="viewport-toggles">
                 <button 
                   className={`viewport-btn ${viewport === 'desktop' ? 'active' : ''}`} 
@@ -274,6 +399,15 @@ export default function PromptStudio() {
         </section>
 
       </div>
+
+      {/* ML Quality & WCAG Audit Modal */}
+      <MLAuditModal
+        isOpen={isAuditOpen}
+        onClose={() => setIsAuditOpen(false)}
+        evalData={evalData}
+        onAutoFix={handleAutoFix}
+        isFixing={isAuditFixing}
+      />
     </div>
   );
 }

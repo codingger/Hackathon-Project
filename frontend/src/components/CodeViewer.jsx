@@ -13,7 +13,7 @@ export default function CodeViewer({ code, label }) {
     <div className="code-viewer">
       <div className="code-viewer-header">
         <span className="code-label">{label}</span>
-        <button className="copy-btn" onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button>
+        <button className="copy-btn" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
       </div>
       <pre><code>{code || 'Nothing generated yet.'}</code></pre>
     </div>

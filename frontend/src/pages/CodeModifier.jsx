@@ -191,7 +191,7 @@ export default function CodeModifier() {
                 ) : !isMeaningfulPrompt ? (
                   'Describe the feature in a few words (e.g. "add dark mode toggle")'
                 ) : (
-                  <span>✓ Component & directives ready to evolve</span>
+                  <span>Component & directives ready to evolve</span>
                 )}
               </div>
 
@@ -214,7 +214,7 @@ export default function CodeModifier() {
                 className={`stage-tab ${tab === 'editor' ? 'active' : ''}`} 
                 onClick={() => setTab('editor')}
               >
-                ✏️ Visual Hand Editor
+                Visual Hand Editor
               </button>
               <button 
                 className={`stage-tab ${tab === 'jsx' ? 'active' : ''}`} 
@@ -231,6 +231,15 @@ export default function CodeModifier() {
             </div>
 
             <div className="stage-actions">
+              <button 
+                type="button" 
+                onClick={() => { setCode(''); setResultJsx(''); setResultCss(''); setPrompt(''); setRefinePrompt(''); }}
+                className="preset-chip"
+                style={{ background: '#991b1b', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                title="Reset canvas and clear editor"
+              >
+                Reset Canvas
+              </button>
               <div className="viewport-toggles">
                 <button 
                   className={`viewport-btn ${viewport === 'desktop' ? 'active' : ''}`} 
@@ -251,7 +260,7 @@ export default function CodeModifier() {
           </header>
 
           <div className="stage-body">
-            {tab === 'preview' && <PreviewSandbox jsx={resultJsx} css={resultCss} viewport={viewport} />}
+            {tab === 'preview' && <PreviewSandbox jsx={resultJsx || code} css={resultCss} viewport={viewport} />}
             {tab === 'editor' && (
               <div className="integrated-editor-layout">
                 <VisualElementEditor jsx={displayCode} onJsxChange={resultJsx ? setResultJsx : setCode} />

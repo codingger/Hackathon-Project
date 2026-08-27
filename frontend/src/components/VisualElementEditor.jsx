@@ -15,7 +15,9 @@ export default function VisualElementEditor({ jsx, onJsxChange }) {
     while ((match = regex.exec(jsx)) !== null) {
       const tag = match[1].toLowerCase();
       const text = match[2];
-      if (!text.includes('React.') && !text.includes('function')) {
+      // Skip React code, functions, and empty decorative span/container tags
+      const isDecorativeSpan = tag === 'span' && text.trim().length === 0;
+      if (!text.includes('React.') && !text.includes('function') && !isDecorativeSpan) {
         items.push({
           id: `el_${index++}`,
           tag: tag,
